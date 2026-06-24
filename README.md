@@ -2,6 +2,6 @@
 
 Download the latest `poker.exe` from this branch to play.
 
-**Current version:** v0.2-table-games (AI opponents, Hold'em, 5-Card Draw, Duel Mode)
+**Current version:** v0.3-sound (full sound + music, all game modes playable)
 
-> The packaged `.exe` will be added here in a future release. Check back soon!
+**How to play:** Download `poker.exe` and double-click. No installation needed.
