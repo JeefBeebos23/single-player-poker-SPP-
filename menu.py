@@ -47,6 +47,8 @@ class Menu:
         return None
 
     def draw(self, balance: int, difficulty: int) -> None:
+        if not self._slider._dragging:
+            self._slider._value = float(difficulty)
         self.screen.blit(self._title, self._title_rect)
 
         bal_text = self._font_small.render(f'Balance: ${balance:,}', True, _GOLD)
