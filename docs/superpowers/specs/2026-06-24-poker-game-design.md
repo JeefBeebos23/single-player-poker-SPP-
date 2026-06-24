@@ -90,7 +90,7 @@ Four selectable modes from the main menu:
 
 ## Modifier System (`core/modifiers.py`)
 
-Architecture placeholder for the future Party Mode. Defines a `ModifierSet` class — an object that holds active modifier flags and values for a session. All game modules accept a `ModifierSet` at startup and check it at relevant decision points. For all currently implemented modes, the `ModifierSet` is always empty.
+Architecture placeholder shared by Party Mode and Roguelike Mode. Defines a `ModifierSet` class — an object that holds active modifier flags and values for a session. All game modules accept a `ModifierSet` at startup and check it at relevant decision points. For all currently implemented modes, the `ModifierSet` is always empty.
 
 **Planned modifiers (not yet implemented):**
 - Wildcard cards
@@ -100,6 +100,8 @@ Architecture placeholder for the future Party Mode. Defines a `ModifierSet` clas
 - Other Balatro-style rule modifiers
 
 Party Mode will be a fourth entry point in `menu.py` — lets the player pick or randomize modifiers, then launches an existing game engine with a populated `ModifierSet`.
+
+Roguelike Mode (see below) consumes the same `ModifierSet` but populates it programmatically based on the current run round rather than player selection.
 
 ---
 
@@ -145,7 +147,8 @@ poker-game/
 │   ├── video_poker.py
 │   ├── holdem.py
 │   ├── five_card_draw.py
-│   └── duel.py                    # 1v1 wrapper
+│   ├── duel.py                    # 1v1 wrapper
+│   └── roguelike.py               # Placeholder stub — not yet implemented
 ├── ai/
 │   ├── engine.py                  # Bell-curve decision engine
 │   ├── personality.py             # Randomized name + trait generation
@@ -217,5 +220,31 @@ pyinstaller build/poker.spec
 
 - Multiplayer / networking
 - Party Mode modifier implementation (architecture placeholder only)
+- Roguelike Mode implementation (architecture placeholder only — see below)
 - Leaderboards or stats tracking
 - Mobile or web versions
+
+---
+
+## Placeholder: Roguelike Progression Mode
+
+**Not implemented in v1. Architecture is reserved — `game/roguelike.py` is a stub file.**
+
+A Balatro-inspired endless progression mode. The run is structured as a series of rounds, each harder than the last, with modifiers layering in as the run progresses.
+
+**Intended design (to be fully specified when modifiers are ready):**
+
+- Player starts at Easy difficulty with no modifiers active
+- Each round completed advances the run — difficulty increases along a curve toward Hard
+- At intervals, a new modifier is added to the active `ModifierSet` (e.g., round 5 adds a 3-second decision timer, round 8 makes all opponent hands visible, etc.)
+- Stacking modifiers create increasingly chaotic and challenging combinations
+- The run ends when the player goes broke or quits — there is no "win" state, only how far you get
+- Bankroll resets at the start of each run (separate from the persistent main bankroll)
+- Final round count and bankroll at bust are recorded as a personal best
+
+**Dependencies before implementation:**
+- `core/modifiers.py` fully built out with all planned modifiers
+- Party Mode implemented first (proves the modifier pipeline works)
+- Roguelike round/progression curve designed and balanced
+
+**File stub:** `game/roguelike.py` — created as an empty placeholder so the branch and import structure are reserved.
