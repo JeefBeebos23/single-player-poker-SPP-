@@ -24,23 +24,23 @@ def generate_opponents(n: int, difficulty: int) -> list[Personality]:
         used_names.add(name)
 
         if difficulty == 0:
-            lt   = random.gauss(0.70, 0.15)
-            ap   = random.gauss(0.30, 0.20)
-            freq = random.uniform(0.5, 0.9)
+            loose_tight        = random.gauss(0.70, 0.15)
+            aggressive_passive = random.gauss(0.30, 0.20)
+            talk_freq          = random.uniform(0.5, 0.9)
         elif difficulty == 2:
-            lt   = random.gauss(0.35, 0.10)
-            ap   = random.gauss(0.70, 0.10)
-            freq = random.uniform(0.1, 0.4)
+            loose_tight        = random.gauss(0.35, 0.10)
+            aggressive_passive = random.gauss(0.70, 0.10)
+            talk_freq          = random.uniform(0.1, 0.4)
         else:
-            lt   = random.gauss(0.50, 0.20)
-            ap   = random.gauss(0.50, 0.20)
-            freq = random.uniform(0.3, 0.7)
+            loose_tight        = random.gauss(0.50, 0.20)
+            aggressive_passive = random.gauss(0.50, 0.20)
+            talk_freq          = random.uniform(0.3, 0.7)
 
         opponents.append(Personality(
             name=name,
-            loose_tight=max(0.0, min(1.0, lt)),
-            aggressive_passive=max(0.0, min(1.0, ap)),
-            talk_frequency=max(0.0, min(1.0, freq)),
+            loose_tight=max(0.0, min(1.0, loose_tight)),
+            aggressive_passive=max(0.0, min(1.0, aggressive_passive)),
+            talk_frequency=max(0.0, min(1.0, talk_freq)),
         ))
     return opponents
 

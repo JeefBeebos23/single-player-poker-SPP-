@@ -23,19 +23,19 @@ def test_values_in_range():
 
 def test_easy_tends_loose():
     """Easy bots average loose_tight > 0.5 over many samples."""
-    ops = generate_opponents(50, difficulty=0)
+    ops = generate_opponents(100, difficulty=0)
     avg = sum(p.loose_tight for p in ops) / len(ops)
     assert avg > 0.5
 
 def test_hard_tends_tight():
     """Hard bots average loose_tight < 0.5 over many samples."""
-    ops = generate_opponents(50, difficulty=2)
+    ops = generate_opponents(100, difficulty=2)
     avg = sum(p.loose_tight for p in ops) / len(ops)
     assert avg < 0.5
 
 def test_hard_tends_aggressive():
     """Hard bots average aggressive_passive > 0.5 over many samples."""
-    ops = generate_opponents(50, difficulty=2)
+    ops = generate_opponents(100, difficulty=2)
     avg = sum(p.aggressive_passive for p in ops) / len(ops)
     assert avg > 0.5
 
