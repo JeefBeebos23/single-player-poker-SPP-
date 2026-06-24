@@ -1,4 +1,5 @@
 from collections import Counter
+from itertools import combinations as _combinations
 from core.cards import Card
 
 HIGH_CARD = 0
@@ -62,3 +63,14 @@ def evaluate(cards: list[Card]) -> tuple[int, tuple]:
     if freq[0] == 2:
         return (ONE_PAIR, sorted_ranks)
     return (HIGH_CARD, tuple(ranks))
+
+def best_hand(cards: list[Card]) -> tuple[int, tuple]:
+    """Return the best evaluate() result from all 5-card combos in cards (min 5 cards)."""
+    if len(cards) == 5:
+        return evaluate(cards)
+    best = None
+    for combo in _combinations(cards, 5):
+        result = evaluate(list(combo))
+        if best is None or result > best:
+            best = result
+    return best
