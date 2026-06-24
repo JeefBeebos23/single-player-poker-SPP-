@@ -8,6 +8,7 @@ from ai.engine import decide
 from ai.dialogue import get_line
 from ui.renderer import draw_card, draw_card_back, CARD_W, CARD_H
 from ui.speech_bubble import SpeechBubble
+import core.sound as sound
 
 _GOLD  = (245, 200, 66)
 _WHITE = (255, 255, 255)
@@ -74,6 +75,7 @@ class FiveCardDraw:
         self._start_round()
 
     def _start_round(self) -> None:
+        sound.play_music('gameplay')
         self._pot = 0
         ante = min(_ANTE, self.balance)
         self.balance -= ante
@@ -82,11 +84,13 @@ class FiveCardDraw:
             ai_ante = min(_ANTE, self._ai_stacks[i])
             self._ai_stacks[i] -= ai_ante
             self._pot += ai_ante
+        sound.play('chip_bet')
 
         self._deck = Deck()
         self._deck.shuffle()
         self._ai_active = [True, True]
         self._hand = self._deck.deal(5)
+        sound.play('deal')
         self._marked = [False] * 5
         for i in range(2):
             self._ai_hands[i] = self._deck.deal(5)
@@ -137,6 +141,7 @@ class FiveCardDraw:
                     self._start_round()
 
     def _player_fold(self) -> None:
+        sound.play('fold')
         active = [i for i in range(2) if self._ai_active[i]]
         if active:
             share = self._pot // len(active)
@@ -148,15 +153,18 @@ class FiveCardDraw:
         self._fire_dialogue('player_folds')
 
     def _player_check(self) -> None:
+        sound.play('check')
         self._ai_betting_round()
 
     def _player_call(self) -> None:
+        sound.play('chip_bet')
         cost = min(self._cur_bet, self.balance)
         self.balance -= cost
         self._pot += cost
         self._ai_betting_round()
 
     def _player_raise(self) -> None:
+        sound.play('chip_bet')
         total = self._cur_bet + _RAISE_STEP
         cost = min(total, self.balance)
         self.balance -= cost
@@ -228,11 +236,13 @@ class FiveCardDraw:
         if winner == 'player':
             self.balance += self._pot
             self._result_msg = f'You win! {HAND_NAMES[player_score[0]]} — +${self._pot}'
+            sound.play('chip_collect')
             self._fire_dialogue('lose_big')
         else:
             self._ai_stacks[winner] += self._pot
             ai_score = evaluate(self._ai_hands[winner])
             self._result_msg = f'{self._opponents[winner].name} wins with {HAND_NAMES[ai_score[0]]}!'
+            sound.play('lose')
             self._fire_dialogue_from('win_pot', winner)
         self._pot = 0
         self._phase = 'result'
@@ -250,12 +260,14 @@ class FiveCardDraw:
                 line = get_line(trigger, self.difficulty, p)
                 if line:
                     self._bubbles[i].show(line)
+                    sound.play('bubble_pop')
                     break
 
     def _fire_dialogue_from(self, trigger: str, idx: int) -> None:
         line = get_line(trigger, self.difficulty, self._opponents[idx])
         if line:
             self._bubbles[idx].show(line)
+            sound.play('bubble_pop')
 
     def _draw(self) -> None:
         self.screen.fill(_FELT)

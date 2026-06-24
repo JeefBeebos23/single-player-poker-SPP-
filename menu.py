@@ -1,5 +1,6 @@
 import pygame
 from ui.components import Button, Slider
+import core.sound as sound
 
 _GOLD = (245, 200, 66)
 _WHITE = (255, 255, 255)
@@ -31,9 +32,20 @@ class Menu:
             (cx - 160, 624, 320, 16), 0, 2, 1,
             font_small, ['Easy', 'Normal', 'Hard']
         )
+        self._btn_music = pygame.Rect(width - 230, height - 50, 100, 34)
+        self._btn_sfx   = pygame.Rect(width - 120, height - 50, 100, 34)
 
     def handle_event(self, event: pygame.event.Event):
         """Returns (kind, value) tuple or None."""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._btn_music.collidepoint(event.pos):
+                sound.toggle_music()
+                sound.play('click')
+                return None
+            if self._btn_sfx.collidepoint(event.pos):
+                sound.toggle_sfx()
+                sound.play('click')
+                return None
         self._slider.handle_event(event)
         if self._slider.changed:
             self._slider.changed = False
@@ -41,6 +53,7 @@ class Menu:
 
         for name, btn in self._buttons.items():
             if btn.handle_event(event):
+                sound.play('click')
                 if name == 'quit':
                     return ('quit', None)
                 return ('play', name)
@@ -57,3 +70,13 @@ class Menu:
         for btn in self._buttons.values():
             btn.draw(self.screen)
         self._slider.draw(self.screen)
+        music_label = 'Music: ON' if sound.music_on() else 'Music: OFF'
+        sfx_label   = 'SFX: ON'   if sound.sfx_on()   else 'SFX: OFF'
+        music_col   = (30, 100, 60) if sound.music_on() else (80, 80, 80)
+        sfx_col     = (30, 100, 60) if sound.sfx_on()   else (80, 80, 80)
+        pygame.draw.rect(self.screen, music_col, self._btn_music, border_radius=6)
+        pygame.draw.rect(self.screen, sfx_col,   self._btn_sfx,   border_radius=6)
+        m_t = self._font_small.render(music_label, True, (255, 255, 255))
+        s_t = self._font_small.render(sfx_label,   True, (255, 255, 255))
+        self.screen.blit(m_t, m_t.get_rect(center=self._btn_music.center))
+        self.screen.blit(s_t, s_t.get_rect(center=self._btn_sfx.center))

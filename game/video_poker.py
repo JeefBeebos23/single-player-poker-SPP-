@@ -8,6 +8,7 @@ from core.hand_evaluator import (
 )
 from core.modifiers import ModifierSet
 from ui.renderer import draw_card, draw_card_back, CARD_W, CARD_H
+import core.sound as sound
 
 _PAYTABLE = {
     ROYAL_FLUSH:     800,
@@ -85,6 +86,7 @@ class VideoPoker:
         self._back_btn = pygame.Rect(30, 30, 100, 36)
         self._card_start_x = card_start_x
         self._card_y = card_y
+        sound.play_music('video_poker')
 
     def run(self) -> int:
         running = True
@@ -130,6 +132,8 @@ class VideoPoker:
         self._deck = Deck()
         self._deck.shuffle()
         self._hand = self._deck.deal(5)
+        sound.play('chip_bet')
+        sound.play('deal')
         self._held = [False] * 5
         self._phase = 'holding'
 
@@ -137,6 +141,7 @@ class VideoPoker:
         for i in range(5):
             if not self._held[i]:
                 self._hand[i] = self._deck.deal(1)[0]
+        sound.play('flip')
         won = payout(self._hand, self._bet)
         self.balance += won
         rank_val, _ = evaluate(self._hand)
@@ -145,6 +150,15 @@ class VideoPoker:
             self._result_msg = 'No Win' if rank_val == ONE_PAIR else HAND_NAMES[rank_val]
         else:
             self._result_msg = HAND_NAMES[rank_val]
+        if won > 0:
+            from core.hand_evaluator import ROYAL_FLUSH
+            rank_val, _ = evaluate(self._hand)
+            if rank_val == ROYAL_FLUSH:
+                sound.play('win_big')
+            else:
+                sound.play('chip_collect')
+        else:
+            sound.play('lose')
         self._phase = 'result'
 
     def _draw(self) -> None:
