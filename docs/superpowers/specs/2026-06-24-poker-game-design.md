@@ -128,9 +128,45 @@ Roguelike Mode (see below) consumes the same `ModifierSet` but populates it prog
 - Felt texture
 - Chip graphics
 - Fonts (casino-style)
-- Sound effects (card deal, chip click, win/lose stings)
+- Sound effects (see Sound Design section below)
+- Background music (see Sound Design section below)
 
 ---
+
+## Sound Design
+
+### Background Music
+Music loops continuously during each game state using Pygame's mixer. Different tracks play for different contexts:
+
+| Context | Track |
+|---|---|
+| Main menu | `Financial-Obligations-PM-Music.mp3` |
+| Gameplay (Hold'em / Draw / Duel) | `Tax-Office-Night-PM-Music.mp3` |
+| Video Poker | `Sunset-Pier-PM-Music.mp3` |
+| Win screen / big hand result | `Also-Sprach-Zarathustra-PM-Music.mp3` |
+
+All tracks sourced from `C:\Users\wbgui\Music\royalty-free-music\` and copied into `assets/music/` at build time. Volume controllable via an in-game settings toggle (music on/off).
+
+### Sound Effects
+One `.wav` or `.mp3` file per action, played via `pygame.mixer.Sound`:
+
+| Event | Sound |
+|---|---|
+| Card dealt to player | `deal.wav` |
+| Card flipped face-up | `flip.wav` |
+| Chips bet / ante placed | `chip_bet.wav` |
+| Chips collected (win) | `chip_collect.wav` |
+| Fold | `fold.wav` |
+| Check | `check.wav` |
+| Big win / royal flush | `win_big.wav` |
+| Lose hand | `lose.wav` |
+| Button click (UI) | `click.wav` |
+| Speech bubble appears | `bubble_pop.wav` |
+| Shuffle (new deck) | `shuffle.wav` |
+
+**SFX source:** To be recorded by the user or downloaded from a free SFX library (e.g., freesound.org). Files dropped into `assets/sounds/` — the game loads them by filename. If a file is missing at launch, that sound is silently skipped so missing SFX never crash the game.
+
+Volume controllable independently from music (SFX on/off toggle in settings).
 
 ## File Structure
 
@@ -158,7 +194,8 @@ poker-game/
 │   └── components.py              # Buttons, sliders, overlays
 ├── assets/
 │   ├── fonts/
-│   ├── sounds/
+│   ├── sounds/                    # SFX .wav files (deal, flip, chip, etc.)
+│   ├── music/                     # Background music .mp3s copied from user's library
 │   └── images/
 ├── build/
 │   └── poker.spec                 # PyInstaller config
