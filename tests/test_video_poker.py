@@ -1,5 +1,5 @@
 from core.cards import Card
-from game.video_poker import VideoPoker, payout, is_jacks_or_better
+from game.video_poker import payout, is_jacks_or_better
 
 def cards(*specs):
     rank_map = {'J': 11, 'Q': 12, 'K': 13, 'A': 14}

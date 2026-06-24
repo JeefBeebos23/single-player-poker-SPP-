@@ -35,8 +35,8 @@ def is_jacks_or_better(hand: list[Card]) -> bool:
     if rank_val != ONE_PAIR:
         return False
     counts = Counter(c.rank for c in hand)
-    pair_rank = next(r for r, cnt in counts.items() if cnt == 2)
-    return pair_rank >= 11
+    pair_ranks = [r for r, cnt in counts.items() if cnt == 2]
+    return max(pair_ranks) >= 11
 
 
 def payout(hand: list[Card], bet: int) -> int:
@@ -51,6 +51,7 @@ class VideoPoker:
     _MIN_BET = 5
     _MAX_BET = 100
     _BET_STEP = 5
+    _CARD_GAP = 16
 
     def __init__(self, screen: pygame.Surface, clock: pygame.time.Clock,
                  balance: int, difficulty: int, modifiers: ModifierSet):
@@ -69,13 +70,12 @@ class VideoPoker:
         self._phase = 'betting'   # 'betting' | 'holding' | 'result'
         self._result_msg = ''
         self._win_amount = 0
-        self._deck = Deck()
 
         bw, bh = 110, 40
-        card_start_x = (self._w - (5 * CARD_W + 4 * 16)) // 2
+        card_start_x = (self._w - (5 * CARD_W + 4 * self._CARD_GAP)) // 2
         card_y = self._h // 2 - CARD_H // 2
         self._hold_rects = [
-            pygame.Rect(card_start_x + i * (CARD_W + 16), card_y + CARD_H + 10, CARD_W, 30)
+            pygame.Rect(card_start_x + i * (CARD_W + self._CARD_GAP), card_y + CARD_H + 10, CARD_W, 30)
             for i in range(5)
         ]
         cx = self._w // 2
@@ -140,12 +140,11 @@ class VideoPoker:
         won = payout(self._hand, self._bet)
         self.balance += won
         rank_val, _ = evaluate(self._hand)
-        if rank_val == ONE_PAIR and not is_jacks_or_better(self._hand):
-            self._result_msg = 'No Win'
-            self._win_amount = 0
+        self._win_amount = won
+        if won == 0:
+            self._result_msg = 'No Win' if rank_val == ONE_PAIR else HAND_NAMES[rank_val]
         else:
             self._result_msg = HAND_NAMES[rank_val]
-            self._win_amount = won
         self._phase = 'result'
 
     def _draw(self) -> None:
@@ -161,7 +160,7 @@ class VideoPoker:
         self.screen.blit(back_t, back_t.get_rect(center=self._back_btn.center))
 
         for i, card in enumerate(self._hand):
-            x = self._card_start_x + i * (CARD_W + 16)
+            x = self._card_start_x + i * (CARD_W + self._CARD_GAP)
             draw_card(self.screen, card, x, self._card_y, self._font, self._held[i])
             if self._phase == 'holding':
                 label = 'HOLD' if self._held[i] else 'DISCARD'
@@ -174,9 +173,14 @@ class VideoPoker:
         self.screen.blit(bet_t, bet_t.get_rect(center=(cx, self._h - 65)))
 
         if self._phase == 'betting':
-            pygame.draw.rect(self.screen, (30, 100, 60), self._deal_btn, border_radius=8)
+            can_deal = self.balance >= self._bet
+            btn_color = (30, 100, 60) if can_deal else (80, 80, 80)
+            pygame.draw.rect(self.screen, btn_color, self._deal_btn, border_radius=8)
             t = self._font.render('DEAL', True, _WHITE)
             self.screen.blit(t, t.get_rect(center=self._deal_btn.center))
+            if not can_deal:
+                msg = self._small.render('Insufficient funds', True, (220, 80, 80))
+                self.screen.blit(msg, msg.get_rect(center=(self._w // 2, self._deal_btn.bottom + 18)))
             pygame.draw.rect(self.screen, (30, 100, 60), self._bet_up, border_radius=4)
             self.screen.blit(self._small.render('+', True, _WHITE), self._bet_up.move(12, 8))
             pygame.draw.rect(self.screen, (30, 100, 60), self._bet_dn, border_radius=4)
