@@ -20,8 +20,8 @@ def test_reset_returns_starting_balance():
     assert result == bankroll.STARTING_BALANCE
     assert bankroll.load() == bankroll.STARTING_BALANCE
 
-def test_save_creates_directory(tmp_path):
+def test_save_creates_directory(tmp_path, monkeypatch):
     nested = str(tmp_path / 'a' / 'b')
-    bankroll._SAVE_DIR = nested
+    monkeypatch.setattr(bankroll, '_SAVE_DIR', nested)
     bankroll.save(500)
     assert bankroll.load() == 500
