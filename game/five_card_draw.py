@@ -74,9 +74,10 @@ class FiveCardDraw:
         self._start_round()
 
     def _start_round(self) -> None:
+        self._pot = 0
         ante = min(_ANTE, self.balance)
         self.balance -= ante
-        self._pot = ante
+        self._pot += ante
         for i in range(2):
             ai_ante = min(_ANTE, self._ai_stacks[i])
             self._ai_stacks[i] -= ai_ante
@@ -84,11 +85,11 @@ class FiveCardDraw:
 
         self._deck = Deck()
         self._deck.shuffle()
+        self._ai_active = [True, True]
         self._hand = self._deck.deal(5)
         self._marked = [False] * 5
         for i in range(2):
-            self._ai_hands[i] = self._deck.deal(5) if self._ai_active[i] else []
-        self._ai_active = [True, True]
+            self._ai_hands[i] = self._deck.deal(5)
         self._cur_bet = 0
         self._phase = 'bet1'
         self._message = 'Round 1 — Bet or check to continue'
@@ -180,10 +181,11 @@ class FiveCardDraw:
                 self._pot += cost
             elif action in ('raise', 'all_in'):
                 raise_amt = _RAISE_STEP if action == 'raise' else self._ai_stacks[i]
-                cost = min(self._cur_bet + raise_amt, self._ai_stacks[i])
-                self._cur_bet = cost
+                new_bet = self._cur_bet + raise_amt
+                cost = min(new_bet, self._ai_stacks[i])
                 self._ai_stacks[i] -= cost
                 self._pot += cost
+                self._cur_bet = new_bet
 
         if self._phase == 'bet1':
             self._phase = 'draw'
@@ -212,25 +214,25 @@ class FiveCardDraw:
         self._message = 'Round 2 — Bet or check'
 
     def _resolve_showdown(self) -> None:
-        player_rank, _ = evaluate(self._hand)
+        player_score = evaluate(self._hand)
         winner = 'player'
-        best_rank = player_rank
+        best_score = player_score
         for i in range(2):
             if not self._ai_active[i]:
                 continue
-            ai_rank, _ = evaluate(self._ai_hands[i])
-            if ai_rank > best_rank:
-                best_rank = ai_rank
+            ai_score = evaluate(self._ai_hands[i])
+            if ai_score > best_score:
+                best_score = ai_score
                 winner = i
 
         if winner == 'player':
             self.balance += self._pot
-            self._result_msg = f'You win! {HAND_NAMES[player_rank]} — +${self._pot}'
+            self._result_msg = f'You win! {HAND_NAMES[player_score[0]]} — +${self._pot}'
             self._fire_dialogue('lose_big')
         else:
             self._ai_stacks[winner] += self._pot
-            ai_rank, _ = evaluate(self._ai_hands[winner])
-            self._result_msg = f'{self._opponents[winner].name} wins with {HAND_NAMES[ai_rank]}!'
+            ai_score = evaluate(self._ai_hands[winner])
+            self._result_msg = f'{self._opponents[winner].name} wins with {HAND_NAMES[ai_score[0]]}!'
             self._fire_dialogue_from('win_pot', winner)
         self._pot = 0
         self._phase = 'result'
