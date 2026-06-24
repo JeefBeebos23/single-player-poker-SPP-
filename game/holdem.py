@@ -7,6 +7,7 @@ from ai.engine import decide
 from ai.dialogue import get_line
 from ui.renderer import draw_card, draw_card_back, CARD_W, CARD_H
 from ui.speech_bubble import SpeechBubble
+import core.sound as sound
 
 _GOLD  = (245, 200, 66)
 _WHITE = (255, 255, 255)
@@ -79,6 +80,7 @@ class HoldEm:
         self._start_hand()
 
     def _start_hand(self) -> None:
+        sound.play_music('gameplay')
         self._pot = 0
         self._ai_active = [True] * _N_AI
 
@@ -91,10 +93,12 @@ class HoldEm:
         self._ai_stacks[0] -= sb
         self._ai_stacks[1] -= bb
         self._pot = sb + bb
+        sound.play('chip_bet')
         self._cur_bet = _BIG_BLIND
 
         # Deal hole cards
         self._hole = self._deck.deal(2)
+        sound.play('deal')
         for i in range(_N_AI):
             self._ai_hands[i] = self._deck.deal(2)
 
@@ -139,6 +143,7 @@ class HoldEm:
                     self._start_hand()
 
     def _player_fold(self) -> None:
+        sound.play('fold')
         active = [i for i in range(_N_AI) if self._ai_active[i]]
         if active:
             share = self._pot // len(active)
@@ -150,15 +155,18 @@ class HoldEm:
         self._fire_dialogue('player_folds')
 
     def _player_check(self) -> None:
+        sound.play('check')
         self._advance_after_player()
 
     def _player_call(self) -> None:
+        sound.play('chip_bet')
         cost = min(self._cur_bet, self.balance)
         self.balance -= cost
         self._pot += cost
         self._advance_after_player()
 
     def _player_raise(self) -> None:
+        sound.play('chip_bet')
         new_bet = self._cur_bet + _RAISE_STEP
         cost = min(new_bet, self.balance)
         self.balance -= cost
@@ -242,12 +250,14 @@ class HoldEm:
         if winner == 'player':
             self.balance += self._pot
             self._result_msg = f'You win! {HAND_NAMES[player_score[0]]} — +${self._pot}'
+            sound.play('chip_collect')
             self._fire_dialogue('lose_big')
         else:
             self._ai_stacks[winner] += self._pot
             ai_all = self._ai_hands[winner] + self._community
             ai_score = best_hand(ai_all)
             self._result_msg = f'{self._opponents[winner].name} wins with {HAND_NAMES[ai_score[0]]}!'
+            sound.play('lose')
             self._fire_dialogue_from('win_pot', winner)
         self._pot = 0
         self._game_phase = 'result'
@@ -258,12 +268,14 @@ class HoldEm:
                 line = get_line(trigger, self.difficulty, p)
                 if line:
                     self._bubbles[i].show(line)
+                    sound.play('bubble_pop')
                     break
 
     def _fire_dialogue_from(self, trigger: str, idx: int) -> None:
         line = get_line(trigger, self.difficulty, self._opponents[idx])
         if line:
             self._bubbles[idx].show(line)
+            sound.play('bubble_pop')
 
     def _draw(self) -> None:
         self.screen.fill(_FELT)
