@@ -376,6 +376,7 @@ class HoldEm:
     def _next_phase(self) -> None:
         self._street_raise_count  = 0
         self._player_must_respond = False
+        self._raise_amt  = _RAISE_STEP
         self._phase_idx += 1
         self._cur_bet    = 0
         now              = pygame.time.get_ticks()

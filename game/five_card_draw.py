@@ -513,6 +513,14 @@ class FiveCardDraw:
                     for j in range(5):
                         bx = sx - 2 * (CARD_W // 2 + 4) + j * (CARD_W // 2 + 4)
                         draw_card_back(self.screen, bx, 150)
+            # Hand name (or folded) below each AI's card area in result
+            if self._phase == 'result':
+                if self._ai_active[i] and self._ai_hands[i]:
+                    ai_rank = evaluate(self._ai_hands[i])[0]
+                    hl = self._small.render(HAND_NAMES[ai_rank], True, _WHITE)
+                else:
+                    hl = self._small.render('(folded)', True, _GRAY)
+                self.screen.blit(hl, hl.get_rect(center=(sx, 150 + CARD_H + 16)))
             self._bubbles[i].draw(self.screen)
 
         # Player hand
@@ -531,21 +539,19 @@ class FiveCardDraw:
                 draw_card(self.screen, card, cx, self._card_y,
                           self._font, self._marked[i])
 
-        if self._phase in ('draw', 'drawing'):
+        if self._phase == 'draw':
             for i in range(5):
-                if self._phase == 'drawing' and i in self._draw_indices and i not in revealed_set:
-                    continue  # card back — no label
                 label = 'DISCARD' if self._marked[i] else 'HOLD'
                 color = _RED if self._marked[i] else _GREEN
                 t = self._small.render(label, True, color)
                 self.screen.blit(t, t.get_rect(center=self._hold_rects[i].center))
 
-        # Live hand label below player cards (all active phases except result)
+        # Live hand label below hold-rect row (all active phases except result/drawing)
         if self._hand and self._phase not in ('result', 'drawing'):
             rank = evaluate(self._hand)[0]
             ht = self._small.render(f'Your hand: {HAND_NAMES[rank]}', True, _GOLD)
             self.screen.blit(ht, ht.get_rect(
-                center=(self._w // 2, self._card_y + CARD_H + 18)))
+                center=(self._w // 2, self._card_y + CARD_H + 50)))
 
         # Back button
         pygame.draw.rect(self.screen, _GRAY, self._btn_back, border_radius=6)
@@ -587,16 +593,18 @@ class FiveCardDraw:
                         _GOLD, self._h // 2 - 20)
 
         elif self._phase == 'result':
+            # Player hand name below their cards
+            if self._hand:
+                player_rank = evaluate(self._hand)[0]
+                ht = self._small.render(f'Your hand: {HAND_NAMES[player_rank]}', True, _GOLD)
+                self.screen.blit(ht, ht.get_rect(
+                    center=(self._w // 2, self._card_y + CARD_H + 18)))
             r = self._font.render(self._result_msg, True, _GOLD)
             r_rect = r.get_rect(center=(self._w // 2, self._card_y + CARD_H + 50))
             bg = r_rect.inflate(24, 12)
             pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
             pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
             self.screen.blit(r, r_rect)
-            for k, line in enumerate(self._result_hand_lines):
-                ht = self._small.render(line, True, _WHITE)
-                self.screen.blit(ht, ht.get_rect(
-                    center=(self._w // 2, self._card_y + CARD_H + 78 + k * 22)))
             label = 'Game Over' if self.balance <= 0 else 'Next Hand'
             self._draw_btn(self._btn_next, label, _GRAY if self.balance <= 0 else _GREEN)
 
