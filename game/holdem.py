@@ -178,8 +178,11 @@ class HoldEm:
                 sound.handle_event(event)
                 if event.type == pygame.QUIT:
                     self._running = False
-                elif event.type == pygame.KEYDOWN and self._typing_raise:
-                    self._handle_raise_key(event)
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_F11:
+                        pygame.display.toggle_fullscreen()
+                    elif self._typing_raise:
+                        self._handle_raise_key(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._game_phase != 'ai_turn':
                         self._handle_click(event.pos)

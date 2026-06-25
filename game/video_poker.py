@@ -129,6 +129,8 @@ class VideoPoker:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                    pygame.display.toggle_fullscreen()
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._back_btn.collidepoint(event.pos):
                         running = False

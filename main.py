@@ -13,7 +13,8 @@ def main():
     pygame.mixer.init()
     sound.init()
     sound.play_music('menu')
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    screen = pygame.display.set_mode(
+        (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
     pygame.display.set_caption('Single Player Poker')
     clock = pygame.time.Clock()
 
@@ -30,6 +31,8 @@ def main():
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                    pygame.display.toggle_fullscreen()
                 else:
                     action = menu.handle_event(event)
 
