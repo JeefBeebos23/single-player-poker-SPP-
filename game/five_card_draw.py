@@ -33,9 +33,13 @@ _ACTION_LABELS = {
 }
 
 
+_DRAW_STEP_MS  = 800   # ms between each replacement card reveal
+
+
 class FiveCardDraw:
     def __init__(self, screen: pygame.Surface, clock: pygame.time.Clock,
-                 balance: int, difficulty: int, modifiers: ModifierSet):
+                 balance: int, difficulty: int, modifiers: ModifierSet,
+                 num_ai: int = 2):
         self.screen = screen
         self.clock  = clock
         self.balance = balance
@@ -46,15 +50,19 @@ class FiveCardDraw:
         self._font_banner = pygame.font.SysFont('Georgia', 40, bold=True)
         self._small       = pygame.font.SysFont('Georgia', 18)
 
-        self._opponents: list[Personality] = generate_opponents(2, difficulty)
-        self._ai_hands:  list[list[Card]]  = [[], []]
-        self._ai_active: list[bool]        = [True, True]
-        self._ai_stacks: list[int]         = [1000, 1000]
+        self._num_ai    = num_ai
+        self._opponents = generate_opponents(num_ai, difficulty)
+        self._ai_hands: list[list[Card]] = [[] for _ in range(num_ai)]
+        self._ai_active: list[bool]      = [True] * num_ai
+        self._ai_stacks: list[int]       = [1000] * num_ai
 
-        self._bubbles = [
-            SpeechBubble(self._w // 4,     80, self._small),
-            SpeechBubble(3 * self._w // 4, 80, self._small),
-        ]
+        if num_ai == 1:
+            self._opp_xs = [self._w // 2]
+            bubble_xs    = [self._w // 2]
+        else:
+            self._opp_xs = [self._w // 4, 3 * self._w // 4]
+            bubble_xs    = [self._w // 4, 3 * self._w // 4]
+        self._bubbles = [SpeechBubble(x, 80, self._small) for x in bubble_xs]
 
         self._hand:   list[Card] = []
         self._marked: list[bool] = [False] * 5
@@ -64,7 +72,13 @@ class FiveCardDraw:
         self._cur_bet  = 0
         self._phase    = 'start'
         self._message  = ''
-        self._result_msg = ''
+        self._result_msg        = ''
+        self._result_hand_lines: list[str] = []
+
+        # Draw animation state
+        self._draw_indices:  list[int] = []   # card positions being replaced
+        self._draw_revealed: int       = 0    # how many new cards shown so far
+        self._draw_next_at:  int       = 0    # next reveal timestamp
 
         # AI sequential animation state
         self._ai_queue:        list = []
@@ -117,7 +131,7 @@ class FiveCardDraw:
         ante = min(_ANTE, self.balance)
         self.balance -= ante
         self._pot += ante
-        for i in range(2):
+        for i in range(self._num_ai):
             ai_ante = min(_ANTE, self._ai_stacks[i])
             self._ai_stacks[i] -= ai_ante
             self._pot += ai_ante
@@ -125,11 +139,14 @@ class FiveCardDraw:
 
         self._deck = Deck()
         self._deck.shuffle()
-        self._ai_active = [True, True]
+        self._ai_active = [True] * self._num_ai
+        self._result_hand_lines = []
+        self._draw_indices  = []
+        self._draw_revealed = 0
         self._hand = self._deck.deal(5)
         sound.play('deal')
         self._marked = [False] * 5
-        for i in range(2):
+        for i in range(self._num_ai):
             self._ai_hands[i] = self._deck.deal(5)
         self._cur_bet = 0
         self._phase   = 'bet1'
@@ -150,11 +167,11 @@ class FiveCardDraw:
                 if event.type == pygame.QUIT:
                     self._running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if self._phase != 'ai_turn':
+                    if self._phase not in ('ai_turn', 'drawing'):
                         self._handle_click(event.pos)
 
+            now = pygame.time.get_ticks()
             if self._phase == 'ai_turn':
-                now = pygame.time.get_ticks()
                 if len(self._ai_queue) == 0:
                     self._apply_ai_pending()
                 elif now - self._ai_action_start >= _AI_ACTION_MS:
@@ -164,6 +181,25 @@ class FiveCardDraw:
                     else:
                         self._ai_action_start = now
                         self._play_ai_action_sound(self._ai_queue[self._ai_queue_idx][2])
+
+            elif self._phase == 'drawing' and now >= self._draw_next_at:
+                if self._draw_revealed < len(self._draw_indices):
+                    sound.play('flip')
+                    self._draw_revealed += 1
+                    if self._draw_revealed < len(self._draw_indices):
+                        self._draw_next_at = now + _DRAW_STEP_MS
+                    else:
+                        self._draw_next_at = now + 500  # pause after last card
+                else:
+                    # Animation done → advance to second betting round
+                    self._marked = [False] * 5
+                    self._cur_bet            = 0
+                    self._phase              = 'bet2'
+                    self._message            = 'Round 2 — Bet or check'
+                    self._phase_banner_until = now + 600
+                    self._phase_banner_text  = 'BET ROUND 2'
+                    self._raise_amt          = _RAISE_STEP
+                    self._your_turn_until    = now + 700
 
             self._draw()
             pygame.display.flip()
@@ -221,7 +257,7 @@ class FiveCardDraw:
     def _player_fold(self) -> None:
         sound.play('fold')
         sound.stop_music()
-        active = [i for i in range(2) if self._ai_active[i]]
+        active = [i for i in range(self._num_ai) if self._ai_active[i]]
         if active:
             share = self._pot // len(active)
             for i in active:
@@ -316,9 +352,10 @@ class FiveCardDraw:
                     sound.play('raise')
 
         # If all opponents have folded, player wins immediately
-        active = [i for i in range(2) if self._ai_active[i]]
+        active = [i for i in range(self._num_ai) if self._ai_active[i]]
         if not active:
             sound.stop_music()
+            sound.play('win_big')
             self.balance     += self._pot
             self._result_msg  = f'All opponents folded!  You win ${self._pot}.'
             self._pot         = 0
@@ -343,11 +380,15 @@ class FiveCardDraw:
     # ------------------------------------------------------------------
 
     def _do_draw(self) -> None:
-        for i in range(5):
-            if self._marked[i] and len(self._deck) > 0:
-                self._hand[i] = self._deck.deal(1)[0]
-        self._marked = [False] * 5
+        # Record which indices are being replaced for animation
+        self._draw_indices = [i for i in range(5) if self._marked[i]]
 
+        # Replace player cards now (shown face-down until animation reveals them)
+        for i in self._draw_indices:
+            if len(self._deck) > 0:
+                self._hand[i] = self._deck.deal(1)[0]
+
+        # AI draws
         for i, p in enumerate(self._opponents):
             if not self._ai_active[i]:
                 continue
@@ -358,27 +399,44 @@ class FiveCardDraw:
                     worst = min(range(5), key=lambda j: self._ai_hands[i][j].rank)
                     self._ai_hands[i][worst] = self._deck.deal(1)[0]
 
-        sound.play('flip')
-        now = pygame.time.get_ticks()
-        self._cur_bet            = 0
-        self._phase              = 'bet2'
-        self._message            = 'Round 2 — Bet or check'
-        self._phase_banner_until = now + 600
-        self._phase_banner_text  = 'BET ROUND 2'
-        self._raise_amt          = _RAISE_STEP
+        if not self._draw_indices:
+            # Kept all 5 — no animation needed, go straight to bet2
+            self._marked = [False] * 5
+            now = pygame.time.get_ticks()
+            self._cur_bet            = 0
+            self._phase              = 'bet2'
+            self._message            = 'Round 2 — Bet or check'
+            self._phase_banner_until = now + 600
+            self._phase_banner_text  = 'BET ROUND 2'
+            self._raise_amt          = _RAISE_STEP
+        else:
+            # Start card-flip animation for replaced cards
+            self._draw_revealed = 0
+            self._draw_next_at  = pygame.time.get_ticks() + 300
+            self._phase         = 'drawing'
 
     def _resolve_showdown(self) -> None:
         sound.stop_music()
         player_score = evaluate(self._hand)
         winner       = 'player'
         best_score   = player_score
-        for i in range(2):
+        for i in range(self._num_ai):
             if not self._ai_active[i]:
                 continue
             ai_score = evaluate(self._ai_hands[i])
             if ai_score > best_score:
                 best_score = ai_score
                 winner     = i
+
+        # Build hand summary (item 1)
+        self._result_hand_lines = [f'You: {HAND_NAMES[player_score[0]]}']
+        for i in range(self._num_ai):
+            if not self._ai_active[i]:
+                self._result_hand_lines.append(f'{self._opponents[i].name}: (folded)')
+            else:
+                s = evaluate(self._ai_hands[i])
+                self._result_hand_lines.append(
+                    f'{self._opponents[i].name}: {HAND_NAMES[s[0]]}')
 
         if winner == 'player':
             self.balance     += self._pot
@@ -438,7 +496,7 @@ class FiveCardDraw:
         self.screen.blit(bal, bal.get_rect(center=(self._w // 2, 75)))
 
         for i, p in enumerate(self._opponents):
-            sx    = self._w // 4 if i == 0 else 3 * self._w // 4
+            sx    = self._opp_xs[i]
             color = _WHITE if self._ai_active[i] else _GRAY
             name_t = self._small.render(p.name, True, color)
             self.screen.blit(name_t, name_t.get_rect(center=(sx, 110)))
@@ -458,15 +516,29 @@ class FiveCardDraw:
             self._bubbles[i].draw(self.screen)
 
         # Player hand
-        for i, card in enumerate(self._hand):
-            draw_card(self.screen, card, self._card_xs[i], self._card_y,
-                      self._font, self._marked[i])
+        revealed_set = set(
+            self._draw_indices[j] for j in range(self._draw_revealed)
+        ) if self._phase == 'drawing' else set()
 
-        if self._phase == 'draw':
+        for i, card in enumerate(self._hand):
+            cx = self._card_xs[i]
+            if self._phase == 'drawing':
+                if i in self._draw_indices and i not in revealed_set:
+                    draw_card_back(self.screen, cx, self._card_y)
+                else:
+                    draw_card(self.screen, card, cx, self._card_y, self._font)
+            else:
+                draw_card(self.screen, card, cx, self._card_y,
+                          self._font, self._marked[i])
+
+        if self._phase in ('draw', 'drawing'):
             for i in range(5):
-                if self._marked[i]:
-                    t = self._small.render('DISCARD', True, _RED)
-                    self.screen.blit(t, t.get_rect(center=self._hold_rects[i].center))
+                if self._phase == 'drawing' and i in self._draw_indices and i not in revealed_set:
+                    continue  # card back — no label
+                label = 'DISCARD' if self._marked[i] else 'HOLD'
+                color = _RED if self._marked[i] else _GREEN
+                t = self._small.render(label, True, color)
+                self.screen.blit(t, t.get_rect(center=self._hold_rects[i].center))
 
         # Back button
         pygame.draw.rect(self.screen, _GRAY, self._btn_back, border_radius=6)
@@ -499,8 +571,13 @@ class FiveCardDraw:
         elif self._phase == 'ai_turn':
             if self._ai_queue_idx < len(self._ai_queue):
                 i, p, action = self._ai_queue[self._ai_queue_idx]
-                label = f'{p.name}: {_ACTION_LABELS.get(action, action)}'
-                self._draw_overlay_label(label, _GOLD, self._h // 2 - 20)
+                elapsed = now - self._ai_action_start
+                if elapsed < 500:
+                    self._draw_overlay_label(f"{p.name}'s Turn", _WHITE, self._h // 2 - 20)
+                else:
+                    self._draw_overlay_label(
+                        f'{p.name}: {_ACTION_LABELS.get(action, action)}',
+                        _GOLD, self._h // 2 - 20)
 
         elif self._phase == 'result':
             r = self._font.render(self._result_msg, True, _GOLD)
@@ -509,6 +586,10 @@ class FiveCardDraw:
             pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
             pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
             self.screen.blit(r, r_rect)
+            for k, line in enumerate(self._result_hand_lines):
+                ht = self._small.render(line, True, _WHITE)
+                self.screen.blit(ht, ht.get_rect(
+                    center=(self._w // 2, self._card_y + CARD_H + 78 + k * 22)))
             label = 'Game Over' if self.balance <= 0 else 'Next Hand'
             self._draw_btn(self._btn_next, label, _GRAY if self.balance <= 0 else _GREEN)
 

@@ -37,12 +37,14 @@ class Duel:
                     elif self._btn_holdem.collidepoint(pos):
                         from game.holdem import HoldEm
                         self.balance = HoldEm(self.screen, self.clock,
-                                              self.balance, self.difficulty, self.modifiers).run()
+                                              self.balance, self.difficulty, self.modifiers,
+                                              num_ai=1).run()
                         running = False
                     elif self._btn_draw.collidepoint(pos):
                         from game.five_card_draw import FiveCardDraw
                         self.balance = FiveCardDraw(self.screen, self.clock,
-                                                    self.balance, self.difficulty, self.modifiers).run()
+                                                    self.balance, self.difficulty, self.modifiers,
+                                                    num_ai=1).run()
                         running = False
             self._draw()
             pygame.display.flip()

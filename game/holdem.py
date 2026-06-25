@@ -42,7 +42,8 @@ _ACTION_LABELS = {
 
 class HoldEm:
     def __init__(self, screen: pygame.Surface, clock: pygame.time.Clock,
-                 balance: int, difficulty: int, modifiers: ModifierSet):
+                 balance: int, difficulty: int, modifiers: ModifierSet,
+                 num_ai: int = 2):
         self.screen = screen
         self.clock  = clock
         self.balance = balance
@@ -52,15 +53,19 @@ class HoldEm:
         self._font_banner = pygame.font.SysFont('Georgia', 40, bold=True)
         self._small       = pygame.font.SysFont('Georgia', 18)
 
-        self._opponents = generate_opponents(_N_AI, difficulty)
-        self._ai_stacks = [1000] * _N_AI
-        self._ai_active = [True]  * _N_AI
-        self._ai_hands: list[list[Card]] = [[] for _ in range(_N_AI)]
+        self._num_ai    = num_ai
+        self._opponents = generate_opponents(num_ai, difficulty)
+        self._ai_stacks = [1000] * num_ai
+        self._ai_active = [True]  * num_ai
+        self._ai_hands: list[list[Card]] = [[] for _ in range(num_ai)]
 
-        self._bubbles = [
-            SpeechBubble(self._w // 4,     80, self._small),
-            SpeechBubble(3 * self._w // 4, 80, self._small),
-        ]
+        if num_ai == 1:
+            self._opp_xs = [self._w // 2]
+            bubble_xs    = [self._w // 2]
+        else:
+            self._opp_xs = [self._w // 4, 3 * self._w // 4]
+            bubble_xs    = [self._w // 4, 3 * self._w // 4]
+        self._bubbles = [SpeechBubble(x, 80, self._small) for x in bubble_xs]
 
         self._hole:      list[Card] = []
         self._community: list[Card] = []
@@ -70,7 +75,8 @@ class HoldEm:
         self._phase      = 'pre_flop'
         self._phase_idx  = 0
         self._message    = ''
-        self._result_msg = ''
+        self._result_msg        = ''
+        self._result_hand_lines: list[str] = []
         self._game_phase = 'start'
         self._running    = True
 
@@ -112,23 +118,28 @@ class HoldEm:
     def _start_hand(self) -> None:
         sound.play_music('gameplay')
         self._pot = 0
-        self._ai_active = [True] * _N_AI
+        self._ai_active = [True] * self._num_ai
         self._raise_amt = _RAISE_STEP
+        self._result_hand_lines = []
 
         self._deck = Deck()
         self._deck.shuffle()
 
         sb = min(_SMALL_BLIND, self._ai_stacks[0])
-        bb = min(_BIG_BLIND,   self._ai_stacks[1])
         self._ai_stacks[0] -= sb
-        self._ai_stacks[1] -= bb
-        self._pot = sb + bb
+        self._pot = sb
+        if self._num_ai >= 2:
+            bb = min(_BIG_BLIND, self._ai_stacks[1])
+            self._ai_stacks[1] -= bb
+            self._pot += bb
+            self._cur_bet = _BIG_BLIND
+        else:
+            self._cur_bet = _SMALL_BLIND
         sound.play('chip_bet')
-        self._cur_bet = _BIG_BLIND
 
         self._hole = self._deck.deal(2)
         sound.play('deal')
-        for i in range(_N_AI):
+        for i in range(self._num_ai):
             self._ai_hands[i] = self._deck.deal(2)
 
         self._community       = []
@@ -215,7 +226,7 @@ class HoldEm:
     def _player_fold(self) -> None:
         sound.play('fold')
         sound.stop_music()
-        active = [i for i in range(_N_AI) if self._ai_active[i]]
+        active = [i for i in range(self._num_ai) if self._ai_active[i]]
         if active:
             share = self._pot // len(active)
             for i in active:
@@ -297,7 +308,9 @@ class HoldEm:
     def _apply_ai_pending(self) -> None:
         """Apply all pre-computed AI actions and advance the hand."""
         for i, p, action in self._ai_queue:
-            if action == 'fold' and self._cur_bet > 0:
+            if action == 'fold' and self._cur_bet == 0:
+                action = 'check'  # can't fold for free; treat as check
+            if action == 'fold':
                 self._ai_active[i] = False
                 self._fire_dialogue_from('lose_big', i)
             elif action in ('call', 'check'):
@@ -312,7 +325,7 @@ class HoldEm:
                 self._pot  += cost
                 self._cur_bet = new_bet
 
-        active = [i for i in range(_N_AI) if self._ai_active[i]]
+        active = [i for i in range(self._num_ai) if self._ai_active[i]]
         if not active:
             sound.stop_music()
             sound.play('win_big')
@@ -361,7 +374,7 @@ class HoldEm:
         winner       = 'player'
         best_score   = player_score
 
-        for i in range(_N_AI):
+        for i in range(self._num_ai):
             if not self._ai_active[i]:
                 continue
             ai_score = best_hand(self._ai_hands[i] + self._community)
@@ -369,9 +382,21 @@ class HoldEm:
                 best_score = ai_score
                 winner     = i
 
+        # Build per-player hand summary for result display (item 1)
+        self._result_hand_lines = []
+        player_hand_name = HAND_NAMES[player_score[0]]
+        self._result_hand_lines.append(f'You: {player_hand_name}')
+        for i in range(self._num_ai):
+            if not self._ai_active[i]:
+                self._result_hand_lines.append(f'{self._opponents[i].name}: (folded)')
+            else:
+                s = best_hand(self._ai_hands[i] + self._community)
+                self._result_hand_lines.append(
+                    f'{self._opponents[i].name}: {HAND_NAMES[s[0]]}')
+
         if winner == 'player':
             self.balance    += self._pot
-            self._result_msg = f'You win!  {HAND_NAMES[player_score[0]]} — +${self._pot}'
+            self._result_msg = f'You win!  {player_hand_name} — +${self._pot}'
             sound.play('win_big')
             self._fire_dialogue('lose_big')
         else:
@@ -422,7 +447,7 @@ class HoldEm:
 
         # Opponents
         for i, p in enumerate(self._opponents):
-            sx    = self._w // 4 if i == 0 else 3 * self._w // 4
+            sx    = self._opp_xs[i]
             color = _WHITE if self._ai_active[i] else _GRAY
             self.screen.blit(
                 self._small.render(p.name, True, color),
@@ -479,24 +504,33 @@ class HoldEm:
             self._draw_btn(self._btn_plus,  '+', _GRAY)
             self._draw_btn(self._btn_allin, 'All In', _RED)
 
+            # Live hand label (item 8)
+            if self._hole and len(self._hole + self._community) >= 5:
+                rank, _ = best_hand(self._hole + self._community)
+                ht = self._small.render(f'Your hand: {HAND_NAMES[rank]}', True, _GOLD)
+                self.screen.blit(ht, ht.get_rect(
+                    center=(self._w // 2, self._hole_y + CARD_H + 18)))
+
             # "Your Turn" flash after AI acts
             if now < self._your_turn_until:
-                self._draw_overlay_label('Your Turn', _GREEN,
-                                         self._h // 2 - 20)
+                self._draw_overlay_label('Your Turn', _GREEN, self._h // 2 - 20)
 
             # Phase transition banner (FLOP / TURN / RIVER)
             if now < self._phase_banner_until:
                 self._draw_phase_banner(_PHASE_LABELS.get(self._phase, '').upper())
 
         elif self._game_phase == 'ai_turn':
-            # Show current AI's action label
             if self._ai_queue_idx < len(self._ai_queue):
                 i, p, action = self._ai_queue[self._ai_queue_idx]
-                label = f'{p.name}: {_ACTION_LABELS.get(action, action)}'
-                self._draw_overlay_label(label, _GOLD, self._h // 2 - 20)
+                elapsed = now - self._ai_action_start
+                if elapsed < 500:
+                    label = f"{p.name}'s Turn"
+                    self._draw_overlay_label(label, _WHITE, self._h // 2 - 20)
+                else:
+                    label = f'{p.name}: {_ACTION_LABELS.get(action, action)}'
+                    self._draw_overlay_label(label, _GOLD, self._h // 2 - 20)
 
         elif self._game_phase == 'result':
-            # Result text with backing box, positioned below hole cards
             r_y = self._hole_y + CARD_H + 30
             r   = self._font.render(self._result_msg, True, _GOLD)
             r_rect = r.get_rect(center=(self._w // 2, r_y))
@@ -504,6 +538,12 @@ class HoldEm:
             pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
             pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
             self.screen.blit(r, r_rect)
+
+            # Per-player hand list (item 1)
+            for k, line in enumerate(self._result_hand_lines):
+                ht = self._small.render(line, True, _WHITE)
+                self.screen.blit(ht, ht.get_rect(
+                    center=(self._w // 2, r_y + 30 + k * 22)))
 
             label = 'Game Over' if self.balance <= 0 else 'Next Hand'
             col   = _GRAY if self.balance <= 0 else _GREEN
