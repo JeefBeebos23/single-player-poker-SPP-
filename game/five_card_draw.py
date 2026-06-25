@@ -22,7 +22,7 @@ _BOX   = (8, 30, 15)
 _ANTE        = 10
 _MIN_BET     = 10
 _RAISE_STEP  = 10
-_AI_ACTION_MS = 900  # ms per AI action in sequential display
+_AI_ACTION_MS = 1500  # ms per AI action in sequential display
 
 _ACTION_LABELS = {
     'fold':   'Folds',

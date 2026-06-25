@@ -22,7 +22,7 @@ _SMALL_BLIND  = 5
 _BIG_BLIND    = 10
 _RAISE_STEP   = 10   # minimum / increment for raise
 _N_AI         = 2
-_AI_ACTION_MS = 900  # ms to display each individual AI action
+_AI_ACTION_MS = 1500  # ms to display each individual AI action
 
 _PHASE_LABELS = {
     'pre_flop': 'Pre-Flop',
