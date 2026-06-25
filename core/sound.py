@@ -4,9 +4,11 @@ import pygame
 
 _SFX: dict[str, pygame.mixer.Sound] = {}
 _MUSIC_TRACKS: dict[str, str] = {}
-_music_on = True
-_sfx_on   = True
+_music_on      = True
+_sfx_on        = True
 _current_track = ''
+_music_volume  = 0.3
+_sfx_volume    = 0.7
 
 _SFX_NAMES = [
     'deal', 'flip', 'check', 'chip_bet', 'chip_collect',
@@ -42,6 +44,13 @@ def init() -> None:
         'win':         os.path.join(music_dir, 'win.mp3'),
     }
 
+    try:
+        pygame.mixer.music.set_volume(_music_volume)
+    except Exception:
+        pass
+    for sfx in _SFX.values():
+        sfx.set_volume(_sfx_volume)
+
 
 def play(name: str) -> None:
     """Play a SFX by name. No-op if missing or SFX off."""
@@ -61,6 +70,7 @@ def play_music(context: str) -> None:
         return
     try:
         pygame.mixer.music.load(path)
+        pygame.mixer.music.set_volume(_music_volume)
         pygame.mixer.music.play(-1)
         _current_track = path
     except Exception:
@@ -74,6 +84,30 @@ def stop_music() -> None:
     except Exception:
         pass
     _current_track = ''
+
+
+def set_music_volume(vol: float) -> None:
+    global _music_volume
+    _music_volume = max(0.0, min(1.0, vol))
+    try:
+        pygame.mixer.music.set_volume(_music_volume)
+    except Exception:
+        pass
+
+
+def set_sfx_volume(vol: float) -> None:
+    global _sfx_volume
+    _sfx_volume = max(0.0, min(1.0, vol))
+    for sfx in _SFX.values():
+        sfx.set_volume(_sfx_volume)
+
+
+def music_volume() -> float:
+    return _music_volume
+
+
+def sfx_volume() -> float:
+    return _sfx_volume
 
 
 def toggle_music() -> bool:
