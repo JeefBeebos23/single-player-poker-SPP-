@@ -286,6 +286,8 @@ class HoldEm:
                 hs = 0.0
             po = self._cur_bet / max(1, self._pot) if self._cur_bet > 0 else 0.0
             action = decide(hs, po, self._phase, self.difficulty, p)
+            if action == 'fold' and self._cur_bet == 0:
+                action = 'check'  # can't fold for free
             self._ai_queue.append((i, p, action))
 
         self._ai_queue_idx    = 0
@@ -308,8 +310,6 @@ class HoldEm:
     def _apply_ai_pending(self) -> None:
         """Apply all pre-computed AI actions and advance the hand."""
         for i, p, action in self._ai_queue:
-            if action == 'fold' and self._cur_bet == 0:
-                action = 'check'  # can't fold for free; treat as check
             if action == 'fold':
                 self._ai_active[i] = False
                 self._fire_dialogue_from('lose_big', i)
