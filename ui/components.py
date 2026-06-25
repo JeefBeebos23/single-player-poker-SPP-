@@ -70,3 +70,43 @@ class Slider:
         label = self.labels[self.value] if self.labels else str(self.value)
         text = self.font.render(f'Difficulty: {label}', True, (255, 255, 255))
         surface.blit(text, (self.rect.x, self.rect.y - 28))
+
+
+class VolumeSlider:
+    """Continuous float slider (0.0–1.0) for volume control."""
+
+    def __init__(self, rect: tuple, initial: float, font: pygame.font.Font, label: str):
+        self.rect = pygame.Rect(rect)
+        self._value = max(0.0, min(1.0, float(initial)))
+        self.font = font
+        self.label = label
+        self._dragging = False
+        self.changed = False
+
+    @property
+    def value(self) -> float:
+        return self._value
+
+    def handle_event(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                self._dragging = True
+                self._set_from_x(event.pos[0])
+        if event.type == pygame.MOUSEBUTTONUP:
+            self._dragging = False
+        if event.type == pygame.MOUSEMOTION and self._dragging:
+            self._set_from_x(event.pos[0])
+
+    def _set_from_x(self, mouse_x: int) -> None:
+        ratio = (mouse_x - self.rect.x) / max(self.rect.width, 1)
+        self._value = max(0.0, min(1.0, ratio))
+        self.changed = True
+
+    def draw(self, surface: pygame.Surface) -> None:
+        pygame.draw.rect(surface, _SLIDER_BG, self.rect, border_radius=4)
+        hx = int(self.rect.x + self._value * self.rect.width)
+        handle = pygame.Rect(hx - 10, self.rect.y - 6, 20, self.rect.height + 12)
+        pygame.draw.rect(surface, _GOLD, handle, border_radius=4)
+        pct = int(self._value * 100)
+        text = self.font.render(f'{self.label}: {pct}%', True, (255, 255, 255))
+        surface.blit(text, (self.rect.x, self.rect.y - 28))
