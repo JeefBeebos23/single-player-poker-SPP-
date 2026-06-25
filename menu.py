@@ -1,5 +1,5 @@
 import pygame
-from ui.components import Button, Slider, VolumeSlider
+from ui.components import Button, VolumeSlider
 import core.sound as sound
 
 _GOLD = (245, 200, 66)
@@ -28,10 +28,14 @@ class Menu:
             'duel':           Button((cx - 160, 434, 320, 52), '1v1 Duel',       font_btn),
             'quit':           Button((cx - 160, 522, 320, 52), 'Quit',           font_btn),
         }
-        self._slider = Slider(
-            (cx - 160, 624, 320, 16), 0, 2, 1,
-            font_small, ['Easy', 'Normal', 'Hard']
-        )
+
+        # Difficulty — 3 buttons replacing the old slider
+        self._diff_buttons = [
+            Button((cx - 160, 616, 100, 36), 'Easy',   font_small),
+            Button((cx -  50, 616, 100, 36), 'Normal', font_small),
+            Button((cx +  60, 616, 100, 36), 'Hard',   font_small),
+        ]
+
         self._slider_music = VolumeSlider(
             (40, height - 46, 220, 16),
             sound.music_volume(), font_small, 'Music'
@@ -53,10 +57,10 @@ class Menu:
             self._slider_sfx.changed = False
             sound.set_sfx_volume(self._slider_sfx.value)
 
-        self._slider.handle_event(event)
-        if self._slider.changed:
-            self._slider.changed = False
-            return ('difficulty', self._slider.value)
+        for i, btn in enumerate(self._diff_buttons):
+            if btn.handle_event(event):
+                sound.play('click')
+                return ('difficulty', i)
 
         for name, btn in self._buttons.items():
             if btn.handle_event(event):
@@ -67,8 +71,6 @@ class Menu:
         return None
 
     def draw(self, balance: int, difficulty: int) -> None:
-        if not self._slider._dragging:
-            self._slider._value = float(difficulty)
         self.screen.blit(self._title, self._title_rect)
 
         bal_text = self._font_small.render(f'Balance: ${balance:,}', True, _GOLD)
@@ -76,6 +78,13 @@ class Menu:
 
         for btn in self._buttons.values():
             btn.draw(self.screen)
-        self._slider.draw(self.screen)
+
+        # Difficulty label + 3 buttons
+        diff_label = self._font_small.render('Difficulty:', True, _WHITE)
+        self.screen.blit(diff_label, diff_label.get_rect(
+            center=(self.width // 2, 596)))
+        for i, btn in enumerate(self._diff_buttons):
+            btn.draw(self.screen, selected=(i == difficulty))
+
         self._slider_music.draw(self.screen)
         self._slider_sfx.draw(self.screen)

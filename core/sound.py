@@ -60,6 +60,7 @@ def init() -> None:
         'menu':        os.path.join(music_dir, 'menu.mp3'),
         'video_poker': os.path.join(music_dir, 'video_poker.mp3'),
         'win':         os.path.join(music_dir, 'win.mp3'),
+        'celebration': os.path.join(music_dir, 'celebration.mp3'),
     }
 
     # Scan for playlist tracks (only those that actually exist)
@@ -114,6 +115,24 @@ def play_music(context: str) -> None:
         pygame.mixer.music.load(path)
         pygame.mixer.music.set_volume(_music_volume)
         pygame.mixer.music.play(-1)
+        _current_track = path
+    except Exception:
+        pass
+
+
+def play_music_once(context: str) -> None:
+    """Play a one-shot music track (not looped, doesn't activate the playlist)."""
+    global _current_track, _playlist_active
+    if not _music_on:
+        return
+    _playlist_active = False
+    path = _MUSIC_TRACKS.get(context, '')
+    if not path or not os.path.exists(path):
+        return
+    try:
+        pygame.mixer.music.load(path)
+        pygame.mixer.music.set_volume(_music_volume)
+        pygame.mixer.music.play(0)
         _current_track = path
     except Exception:
         pass
