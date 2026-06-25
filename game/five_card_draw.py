@@ -17,10 +17,20 @@ _RED   = (220, 50, 50)
 _GREEN = (50, 200, 100)
 _GRAY  = (80, 80, 80)
 _DARK  = (30, 30, 30)
+_BOX   = (8, 30, 15)
 
 _ANTE       = 10
 _MIN_BET    = 10
 _RAISE_STEP = 10
+_AI_TURN_MS = 1200
+
+_ACTION_LABELS = {
+    'fold':   'Folds',
+    'check':  'Checks',
+    'call':   'Calls',
+    'raise':  'Raises',
+    'all_in': 'All In!',
+}
 
 
 class FiveCardDraw:
@@ -54,11 +64,21 @@ class FiveCardDraw:
         self._message  = ''
         self._result_msg = ''
 
+        # AI animation state
+        self._ai_pending: list = []
+        self._ai_turn_labels: list[str] = []
+        self._ai_turn_until: int = 0
+        self._ai_prev_phase: str = ''
+
         card_start_x = (self._w - (5 * CARD_W + 4 * 12)) // 2
         self._card_xs = [card_start_x + i * (CARD_W + 12) for i in range(5)]
         self._card_y  = self._h // 2 + 20
         self._hold_rects = [
             pygame.Rect(self._card_xs[i], self._card_y + CARD_H + 8, CARD_W, 28)
+            for i in range(5)
+        ]
+        self._card_rects = [
+            pygame.Rect(self._card_xs[i], self._card_y, CARD_W, CARD_H)
             for i in range(5)
         ]
 
@@ -97,6 +117,8 @@ class FiveCardDraw:
         self._cur_bet = 0
         self._phase = 'bet1'
         self._message = 'Round 1 — Bet or check to continue'
+        self._ai_pending = []
+        self._ai_turn_labels = []
 
     def run(self) -> int:
         while self._running:
@@ -104,7 +126,13 @@ class FiveCardDraw:
                 if event.type == pygame.QUIT:
                     self._running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self._handle_click(event.pos)
+                    if self._phase != 'ai_turn':
+                        self._handle_click(event.pos)
+
+            if self._phase == 'ai_turn':
+                if pygame.time.get_ticks() >= self._ai_turn_until:
+                    self._apply_ai_pending()
+
             self._draw()
             pygame.display.flip()
             self.clock.tick(60)
@@ -126,9 +154,10 @@ class FiveCardDraw:
                 self._player_raise()
 
         elif self._phase == 'draw':
-            for i, rect in enumerate(self._hold_rects):
-                if rect.collidepoint(pos):
+            for i in range(5):
+                if self._hold_rects[i].collidepoint(pos) or self._card_rects[i].collidepoint(pos):
                     self._marked[i] = not self._marked[i]
+                    sound.play('click')
             if self._btn_draw.collidepoint(pos):
                 self._do_draw()
 
@@ -154,32 +183,47 @@ class FiveCardDraw:
 
     def _player_check(self) -> None:
         sound.play('check')
-        self._ai_betting_round()
+        self._start_ai_turn()
 
     def _player_call(self) -> None:
         sound.play('chip_bet')
         cost = min(self._cur_bet, self.balance)
         self.balance -= cost
         self._pot += cost
-        self._ai_betting_round()
+        self._start_ai_turn()
 
     def _player_raise(self) -> None:
-        sound.play('chip_bet')
+        sound.play('raise')
         total = self._cur_bet + _RAISE_STEP
         cost = min(total, self.balance)
         self.balance -= cost
         self._pot += cost
         self._cur_bet = total
         self._fire_dialogue('player_raises')
-        self._ai_betting_round()
+        self._start_ai_turn()
 
-    def _ai_betting_round(self) -> None:
+    def _start_ai_turn(self) -> None:
+        """Pre-compute AI decisions and begin animation delay."""
+        self._ai_pending = []
+        labels = []
         for i, p in enumerate(self._opponents):
             if not self._ai_active[i]:
                 continue
             hs = evaluate(self._ai_hands[i])[0] / 9.0
             po = self._cur_bet / max(1, self._pot) if self._cur_bet > 0 else 0.0
             action = decide(hs, po, 'post_flop', self.difficulty, p)
+            self._ai_pending.append((i, p, action))
+            labels.append(f'{p.name}: {_ACTION_LABELS.get(action, action)}')
+
+        self._ai_turn_labels = labels
+        self._ai_prev_phase = self._phase
+        self._ai_turn_until = pygame.time.get_ticks() + _AI_TURN_MS
+        self._phase = 'ai_turn'
+
+    def _apply_ai_pending(self) -> None:
+        """Apply pre-computed AI actions and advance."""
+        played_sound = False
+        for i, p, action in self._ai_pending:
             if action == 'fold':
                 self._ai_active[i] = False
                 self._fire_dialogue_from('lose_big', i)
@@ -194,11 +238,18 @@ class FiveCardDraw:
                 self._ai_stacks[i] -= cost
                 self._pot += cost
                 self._cur_bet = new_bet
+            if not played_sound:
+                if action == 'raise':
+                    sound.play('raise')
+                    played_sound = True
+                elif action == 'all_in':
+                    sound.play('all_in')
+                    played_sound = True
 
-        if self._phase == 'bet1':
+        if self._ai_prev_phase == 'bet1':
             self._phase = 'draw'
             self._message = 'Click cards to mark for discard, then Draw'
-        elif self._phase == 'bet2':
+        elif self._ai_prev_phase == 'bet2':
             self._resolve_showdown()
 
     def _do_draw(self) -> None:
@@ -217,6 +268,7 @@ class FiveCardDraw:
                     worst = min(range(5), key=lambda j: self._ai_hands[i][j].rank)
                     self._ai_hands[i][worst] = self._deck.deal(1)[0]
 
+        sound.play('flip')
         self._cur_bet = 0
         self._phase = 'bet2'
         self._message = 'Round 2 — Bet or check'
@@ -308,11 +360,26 @@ class FiveCardDraw:
             else:
                 self._draw_btn(self._btn_call, f'Call ${self._cur_bet}', _GREEN)
             self._draw_btn(self._btn_raise, f'Raise +${_RAISE_STEP}', _GOLD)
+
         elif self._phase == 'draw':
             self._draw_btn(self._btn_draw, 'Draw', _GREEN)
+
+        elif self._phase == 'ai_turn':
+            for idx, label in enumerate(self._ai_turn_labels):
+                t = self._font.render(label, True, _GOLD)
+                tr = t.get_rect(center=(self._w // 2, self._h // 2 - 80 + idx * 44))
+                bg = tr.inflate(24, 10)
+                pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
+                pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
+                self.screen.blit(t, tr)
+
         elif self._phase == 'result':
             r = self._font.render(self._result_msg, True, _GOLD)
-            self.screen.blit(r, r.get_rect(center=(self._w // 2, self._h // 2 - 80)))
+            r_rect = r.get_rect(center=(self._w // 2, self._h // 2 - 80))
+            bg = r_rect.inflate(24, 12)
+            pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
+            pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
+            self.screen.blit(r, r_rect)
             label = 'Game Over' if self.balance <= 0 else 'Next Hand'
             self._draw_btn(self._btn_next, label, _GRAY if self.balance <= 0 else _GREEN)
 

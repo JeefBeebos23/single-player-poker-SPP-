@@ -16,17 +16,27 @@ _RED   = (220, 50, 50)
 _GREEN = (50, 200, 100)
 _GRAY  = (80, 80, 80)
 _DARK  = (30, 30, 30)
+_BOX   = (8, 30, 15)
 
 _SMALL_BLIND = 5
 _BIG_BLIND   = 10
 _RAISE_STEP  = 10
 _N_AI        = 2
+_AI_TURN_MS  = 1200  # ms to show AI action labels
 
 _PHASE_LABELS = {
     'pre_flop': 'Pre-Flop',
     'flop':     'Flop',
     'turn':     'Turn',
     'river':    'River',
+}
+
+_ACTION_LABELS = {
+    'fold':   'Folds',
+    'check':  'Checks',
+    'call':   'Calls',
+    'raise':  'Raises',
+    'all_in': 'All In!',
 }
 
 
@@ -61,6 +71,11 @@ class HoldEm:
         self._result_msg = ''
         self._game_phase = 'start'
         self._running    = True
+
+        # AI animation state
+        self._ai_pending: list = []
+        self._ai_turn_labels: list[str] = []
+        self._ai_turn_until: int = 0
 
         # Layout
         comm_y = self._h // 2 - CARD_H // 2
@@ -107,6 +122,8 @@ class HoldEm:
         self._phase     = 'pre_flop'
         self._game_phase = 'betting'
         self._message = f'Pre-Flop — call ${_BIG_BLIND} or raise'
+        self._ai_pending = []
+        self._ai_turn_labels = []
 
     def run(self) -> int:
         while self._running:
@@ -114,7 +131,13 @@ class HoldEm:
                 if event.type == pygame.QUIT:
                     self._running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self._handle_click(event.pos)
+                    if self._game_phase != 'ai_turn':
+                        self._handle_click(event.pos)
+
+            if self._game_phase == 'ai_turn':
+                if pygame.time.get_ticks() >= self._ai_turn_until:
+                    self._apply_ai_pending()
+
             self._draw()
             pygame.display.flip()
             self.clock.tick(60)
@@ -156,51 +179,52 @@ class HoldEm:
 
     def _player_check(self) -> None:
         sound.play('check')
-        self._advance_after_player()
+        self._start_ai_turn()
 
     def _player_call(self) -> None:
         sound.play('chip_bet')
         cost = min(self._cur_bet, self.balance)
         self.balance -= cost
         self._pot += cost
-        self._advance_after_player()
+        self._start_ai_turn()
 
     def _player_raise(self) -> None:
-        sound.play('chip_bet')
+        sound.play('raise')
         new_bet = self._cur_bet + _RAISE_STEP
         cost = min(new_bet, self.balance)
         self.balance -= cost
         self._pot += cost
         self._cur_bet = new_bet
         self._fire_dialogue('player_raises')
-        self._advance_after_player()
+        self._start_ai_turn()
 
-    def _advance_after_player(self) -> None:
-        self._ai_betting_round()
-        active = [i for i in range(_N_AI) if self._ai_active[i]]
-        if not active:
-            self.balance += self._pot
-            self._result_msg = f'All opponents folded! You win ${self._pot}.'
-            self._pot = 0
-            self._game_phase = 'result'
-            return
-        self._next_phase()
-
-    def _ai_betting_round(self) -> None:
+    def _start_ai_turn(self) -> None:
+        """Pre-compute AI decisions and begin animation delay."""
+        self._ai_pending = []
+        labels = []
         for i, p in enumerate(self._opponents):
             if not self._ai_active[i]:
                 continue
             all_cards = self._ai_hands[i] + self._community
             if len(all_cards) >= 5:
-                score = best_hand(all_cards)
-                hs = score[0] / 9.0
+                hs = best_hand(all_cards)[0] / 9.0
             elif len(all_cards) >= 2:
-                # Pre-flop: use highest hole card rank as rough strength proxy
                 hs = max(c.rank for c in self._ai_hands[i]) / 14.0
             else:
                 hs = 0.0
             po = self._cur_bet / max(1, self._pot) if self._cur_bet > 0 else 0.0
             action = decide(hs, po, self._phase, self.difficulty, p)
+            self._ai_pending.append((i, p, action))
+            labels.append(f'{p.name}: {_ACTION_LABELS.get(action, action)}')
+
+        self._ai_turn_labels = labels
+        self._ai_turn_until = pygame.time.get_ticks() + _AI_TURN_MS
+        self._game_phase = 'ai_turn'
+
+    def _apply_ai_pending(self) -> None:
+        """Apply pre-computed AI actions and advance the hand."""
+        played_sound = False
+        for i, p, action in self._ai_pending:
             if action == 'fold' and self._cur_bet > 0:
                 self._ai_active[i] = False
                 self._fire_dialogue_from('lose_big', i)
@@ -215,6 +239,23 @@ class HoldEm:
                 self._ai_stacks[i] -= cost
                 self._pot += cost
                 self._cur_bet = new_bet
+            if not played_sound:
+                if action == 'raise':
+                    sound.play('raise')
+                    played_sound = True
+                elif action == 'all_in':
+                    sound.play('all_in')
+                    played_sound = True
+
+        active = [i for i in range(_N_AI) if self._ai_active[i]]
+        if not active:
+            self.balance += self._pot
+            self._result_msg = f'All opponents folded! You win ${self._pot}.'
+            self._pot = 0
+            self._game_phase = 'result'
+            return
+        self._next_phase()
+        self._game_phase = 'betting'
 
     def _next_phase(self) -> None:
         self._phase_idx += 1
@@ -241,8 +282,7 @@ class HoldEm:
         for i in range(_N_AI):
             if not self._ai_active[i]:
                 continue
-            ai_all = self._ai_hands[i] + self._community
-            ai_score = best_hand(ai_all)
+            ai_score = best_hand(self._ai_hands[i] + self._community)
             if ai_score > best_score:
                 best_score = ai_score
                 winner = i
@@ -254,8 +294,7 @@ class HoldEm:
             self._fire_dialogue('lose_big')
         else:
             self._ai_stacks[winner] += self._pot
-            ai_all = self._ai_hands[winner] + self._community
-            ai_score = best_hand(ai_all)
+            ai_score = best_hand(self._ai_hands[winner] + self._community)
             self._result_msg = f'{self._opponents[winner].name} wins with {HAND_NAMES[ai_score[0]]}!'
             sound.play('lose')
             self._fire_dialogue_from('win_pot', winner)
@@ -326,9 +365,22 @@ class HoldEm:
                 self._draw_btn(self._btn_call, f'Call ${self._cur_bet}', _GREEN)
             self._draw_btn(self._btn_raise, f'Raise +${_RAISE_STEP}', _GOLD)
 
+        elif self._game_phase == 'ai_turn':
+            for idx, label in enumerate(self._ai_turn_labels):
+                t = self._font.render(label, True, _GOLD)
+                tr = t.get_rect(center=(self._w // 2, self._h // 2 + idx * 44))
+                bg = tr.inflate(24, 10)
+                pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
+                pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
+                self.screen.blit(t, tr)
+
         elif self._game_phase == 'result':
             r = self._font.render(self._result_msg, True, _GOLD)
-            self.screen.blit(r, r.get_rect(center=(self._w // 2, self._h // 2 - 20)))
+            r_rect = r.get_rect(center=(self._w // 2, self._h // 2 - 20))
+            bg = r_rect.inflate(24, 12)
+            pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
+            pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
+            self.screen.blit(r, r_rect)
             label = 'Game Over' if self.balance <= 0 else 'Next Hand'
             col   = _GRAY if self.balance <= 0 else _GREEN
             self._draw_btn(self._btn_next, label, col)
