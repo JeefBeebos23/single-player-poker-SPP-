@@ -12,7 +12,7 @@ import core.sound as sound
 
 _PAYTABLE = {
     ROYAL_FLUSH:     800,
-    STRAIGHT_FLUSH:  50,
+    STRAIGHT_FLUSH:   50,
     FOUR_OF_A_KIND:  25,
     FULL_HOUSE:      9,
     FLUSH:           6,
@@ -22,6 +22,18 @@ _PAYTABLE = {
     ONE_PAIR:        1,  # only if Jacks or Better
     HIGH_CARD:       0,
 }
+
+_PAYTABLE_ROWS = [
+    (ROYAL_FLUSH,     'Royal Flush',     800),
+    (STRAIGHT_FLUSH,  'Str. Flush',       50),
+    (FOUR_OF_A_KIND,  '4 of a Kind',      25),
+    (FULL_HOUSE,      'Full House',         9),
+    (FLUSH,           'Flush',              6),
+    (STRAIGHT,        'Straight',           4),
+    (THREE_OF_A_KIND, '3 of a Kind',        3),
+    (TWO_PAIR,        'Two Pair',           2),
+    (ONE_PAIR,        'Jacks or Better',    1),
+]
 
 _GOLD      = (245, 200, 66)
 _WHITE     = (255, 255, 255)
@@ -248,6 +260,9 @@ class VideoPoker:
         back_t = self._small.render('← Menu', True, _WHITE)
         self.screen.blit(back_t, back_t.get_rect(center=self._back_btn.center))
 
+        # Pay table (left side)
+        self._draw_paytable()
+
         # Cards
         revealed_draw = set(
             self._draw_indices[i] for i in range(self._anim_count)
@@ -274,9 +289,19 @@ class VideoPoker:
             # Hold/Discard labels (holding phase only)
             if self._phase == 'holding':
                 label = 'HOLD' if self._held[i] else 'DISCARD'
-                color = _GOLD if self._held[i] else _GRAY
+                color = _GOLD if self._held[i] else _RED_WIN
                 t = self._small.render(label, True, color)
                 self.screen.blit(t, t.get_rect(center=self._hold_rects[i].center))
+
+        # Live hand label during holding phase
+        if self._phase == 'holding' and self._hand:
+            rank, _ = evaluate(self._hand)
+            name = HAND_NAMES[rank]
+            if rank == ONE_PAIR and not is_jacks_or_better(self._hand):
+                name = 'Low Pair (no win)'
+            ht = self._small.render(f'Your hand: {name}', True, _GOLD)
+            self.screen.blit(ht, ht.get_rect(
+                center=(self._w // 2, self._card_y + CARD_H + 18)))
 
         cx = self._w // 2
 
@@ -318,3 +343,48 @@ class VideoPoker:
             pygame.draw.rect(self.screen, (30, 100, 60), self._deal_btn, border_radius=8)
             t = self._font.render('PLAY AGAIN', True, _WHITE)
             self.screen.blit(t, t.get_rect(center=self._deal_btn.center))
+
+    def _draw_paytable(self) -> None:
+        """Render the pay table on the left side of the screen."""
+        # Determine current hand rank for highlight (holding or result)
+        current_rank = None
+        if self._hand and self._phase in ('holding', 'result'):
+            current_rank, _ = evaluate(self._hand)
+            if current_rank == ONE_PAIR and not is_jacks_or_better(self._hand):
+                current_rank = None  # low pair — no win, don't highlight
+
+        x      = 15
+        y      = 140
+        w      = 340
+        row_h  = 32
+        pad    = 8
+
+        # Header
+        hdr = self._small.render('PAY TABLE', True, _GOLD)
+        self.screen.blit(hdr, hdr.get_rect(center=(x + w // 2, y)))
+        y += 24
+        pygame.draw.line(self.screen, _GOLD, (x, y), (x + w, y), 1)
+        y += 6
+
+        for rank, label, mult in _PAYTABLE_ROWS:
+            win_amt = mult * self._bet
+            highlighted = (rank == current_rank)
+
+            if highlighted:
+                bg = pygame.Rect(x, y, w, row_h - 2)
+                pygame.draw.rect(self.screen, (60, 50, 10), bg, border_radius=4)
+                pygame.draw.rect(self.screen, _GOLD, bg, 1, border_radius=4)
+
+            text_color = _GOLD if highlighted else _WHITE
+            name_t  = self._small.render(label, True, text_color)
+            amt_t   = self._small.render(f'${win_amt:,}', True, text_color)
+            self.screen.blit(name_t,  (x + pad, y + (row_h - name_t.get_height()) // 2))
+            self.screen.blit(amt_t,
+                amt_t.get_rect(right=x + w - pad,
+                               centery=y + row_h // 2))
+            y += row_h
+
+        pygame.draw.line(self.screen, _GOLD, (x, y), (x + w, y), 1)
+        y += 8
+        bet_note = self._small.render(f'Bet: ${self._bet}', True, _GRAY)
+        self.screen.blit(bet_note, (x + pad, y))

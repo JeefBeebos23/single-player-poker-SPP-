@@ -22,7 +22,7 @@ _BOX   = (8, 30, 15)
 _ANTE        = 10
 _MIN_BET     = 10
 _RAISE_STEP  = 10
-_AI_ACTION_MS = 1500  # ms per AI action in sequential display
+_AI_ACTION_MS = 2000  # ms per AI action in sequential display
 
 _ACTION_LABELS = {
     'fold':   'Folds',
@@ -539,6 +539,13 @@ class FiveCardDraw:
                 color = _RED if self._marked[i] else _GREEN
                 t = self._small.render(label, True, color)
                 self.screen.blit(t, t.get_rect(center=self._hold_rects[i].center))
+
+        # Live hand label below player cards (all active phases except result)
+        if self._hand and self._phase not in ('result', 'drawing'):
+            rank = evaluate(self._hand)[0]
+            ht = self._small.render(f'Your hand: {HAND_NAMES[rank]}', True, _GOLD)
+            self.screen.blit(ht, ht.get_rect(
+                center=(self._w // 2, self._card_y + CARD_H + 18)))
 
         # Back button
         pygame.draw.rect(self.screen, _GRAY, self._btn_back, border_radius=6)

@@ -22,7 +22,7 @@ _SMALL_BLIND  = 5
 _BIG_BLIND    = 10
 _RAISE_STEP   = 10   # minimum / increment for raise
 _N_AI         = 2
-_AI_ACTION_MS = 1500  # ms to display each individual AI action
+_AI_ACTION_MS = 2000  # ms to display each individual AI action
 
 _PHASE_LABELS = {
     'pre_flop': 'Pre-Flop',
@@ -89,6 +89,10 @@ class HoldEm:
         self._phase_banner_until: int = 0   # show FLOP / TURN / RIVER label
         self._your_turn_until:    int = 0   # show "Your Turn" after AI acts
 
+        # Raise-response state: player must respond to an AI raise
+        self._player_must_respond: bool = False
+        self._street_raise_count:  int  = 0
+
         # Layout
         comm_y = self._h // 2 - CARD_H // 2
         comm_x = (self._w - (5 * CARD_W + 4 * 10)) // 2
@@ -149,8 +153,10 @@ class HoldEm:
         self._message         = f'Pre-Flop — call ${_BIG_BLIND} or raise'
         self._ai_queue        = []
         self._ai_queue_idx    = 0
-        self._phase_banner_until = 0
-        self._your_turn_until    = 0
+        self._phase_banner_until  = 0
+        self._your_turn_until     = 0
+        self._player_must_respond = False
+        self._street_raise_count  = 0
 
     # ------------------------------------------------------------------
     # Game loop
@@ -224,6 +230,7 @@ class HoldEm:
     # ------------------------------------------------------------------
 
     def _player_fold(self) -> None:
+        self._player_must_respond = False
         sound.play('fold')
         sound.stop_music()
         active = [i for i in range(self._num_ai) if self._ai_active[i]]
@@ -246,9 +253,18 @@ class HoldEm:
         cost = min(self._cur_bet, self.balance)
         self.balance -= cost
         self._pot += cost
-        self._start_ai_turn()
+        if self._player_must_respond:
+            # Calling an AI raise — the street ends here
+            self._player_must_respond = False
+            self._next_phase()
+            if self._game_phase != 'result':
+                self._game_phase      = 'betting'
+                self._your_turn_until = pygame.time.get_ticks() + 700
+        else:
+            self._start_ai_turn()
 
     def _player_raise(self) -> None:
+        self._player_must_respond = False  # AI will handle next
         sound.play('raise')
         new_bet = self._cur_bet + self._raise_amt
         cost = min(new_bet, self.balance)
@@ -259,6 +275,7 @@ class HoldEm:
         self._start_ai_turn()
 
     def _player_all_in(self) -> None:
+        self._player_must_respond = False
         sound.play('raise')
         cost = self.balance
         self.balance = 0
@@ -309,6 +326,7 @@ class HoldEm:
 
     def _apply_ai_pending(self) -> None:
         """Apply all pre-computed AI actions and advance the hand."""
+        bet_before = self._cur_bet
         for i, p, action in self._ai_queue:
             if action == 'fold':
                 self._ai_active[i] = False
@@ -336,6 +354,15 @@ class HoldEm:
             self._message = ''
             return
 
+        # If AI raised and player hasn't had a response chance this street yet
+        if self._cur_bet > bet_before and self._street_raise_count == 0:
+            self._street_raise_count  = 1
+            self._player_must_respond = True
+            self._game_phase      = 'betting'
+            self._message         = f'Raised to ${self._cur_bet} — call, raise, or fold'
+            self._your_turn_until = pygame.time.get_ticks() + 700
+            return
+
         self._next_phase()
         # Only switch to betting if _next_phase didn't end the hand
         if self._game_phase != 'result':
@@ -347,21 +374,23 @@ class HoldEm:
     # ------------------------------------------------------------------
 
     def _next_phase(self) -> None:
+        self._street_raise_count  = 0
+        self._player_must_respond = False
         self._phase_idx += 1
         self._cur_bet    = 0
         now              = pygame.time.get_ticks()
         if self._phase_idx == 1:
             self._community = self._deck.deal(3)
             self._phase     = 'flop'
-            self._phase_banner_until = now + 800
+            self._phase_banner_until = now + 1100
         elif self._phase_idx == 2:
             self._community += self._deck.deal(1)
             self._phase      = 'turn'
-            self._phase_banner_until = now + 600
+            self._phase_banner_until = now + 900
         elif self._phase_idx == 3:
             self._community += self._deck.deal(1)
             self._phase      = 'river'
-            self._phase_banner_until = now + 600
+            self._phase_banner_until = now + 900
         else:
             self._showdown()
             return
@@ -474,6 +503,14 @@ class HoldEm:
         for i, card in enumerate(self._hole):
             draw_card(self.screen, card, self._hole_xs[i], self._hole_y, self._font)
 
+        # Live hand label — always visible once ≥5 cards are available
+        if self._hole and self._game_phase not in ('result',) and \
+                len(self._hole + self._community) >= 5:
+            rank, _ = best_hand(self._hole + self._community)
+            ht = self._small.render(f'Your hand: {HAND_NAMES[rank]}', True, _GOLD)
+            self.screen.blit(ht, ht.get_rect(
+                center=(self._w // 2, self._hole_y + CARD_H + 18)))
+
         # Phase label (above community cards)
         phase_label = _PHASE_LABELS.get(self._phase, '')
         if phase_label and self._game_phase in ('betting', 'ai_turn'):
@@ -503,13 +540,6 @@ class HoldEm:
             self._draw_btn(self._btn_raise, f'Raise ${self._raise_amt}', _GOLD)
             self._draw_btn(self._btn_plus,  '+', _GRAY)
             self._draw_btn(self._btn_allin, 'All In', _RED)
-
-            # Live hand label (item 8)
-            if self._hole and len(self._hole + self._community) >= 5:
-                rank, _ = best_hand(self._hole + self._community)
-                ht = self._small.render(f'Your hand: {HAND_NAMES[rank]}', True, _GOLD)
-                self.screen.blit(ht, ht.get_rect(
-                    center=(self._w // 2, self._hole_y + CARD_H + 18)))
 
             # "Your Turn" flash after AI acts
             if now < self._your_turn_until:
