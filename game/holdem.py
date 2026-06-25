@@ -514,6 +514,8 @@ class HoldEm:
             self.screen.blit(msg_t,
                              msg_t.get_rect(center=(self._w // 2, self._h - 100)))
 
+        sound.draw_debug_overlay(self.screen)
+
     def _draw_btn(self, rect: pygame.Rect, label: str, color: tuple) -> None:
         pygame.draw.rect(self.screen, color, rect, border_radius=8)
         t = self._small.render(label, True, _WHITE if color != _GOLD else _DARK)

@@ -10,6 +10,11 @@ _current_track = ''
 _music_volume  = 0.3
 _sfx_volume    = 0.7
 
+# Debug tracking
+_last_sfx_name = ''
+_last_sfx_time = 0      # ms timestamp of last play() call
+_debug_font    = None   # initialised lazily (needs pygame display)
+
 _SFX_NAMES = [
     'deal', 'flip', 'check', 'chip_bet', 'chip_collect',
     'win_big', 'lose', 'click', 'fold', 'bubble_pop', 'startup',
@@ -55,8 +60,11 @@ def init() -> None:
 
 def play(name: str) -> None:
     """Play a SFX by name. No-op if missing or SFX off."""
+    global _last_sfx_name, _last_sfx_time
     if _sfx_on and name in _SFX:
         _SFX[name].play()
+        _last_sfx_name = name
+        _last_sfx_time = pygame.time.get_ticks()
 
 
 def play_music(context: str) -> None:
@@ -138,3 +146,35 @@ def music_on() -> bool:
 
 def sfx_on() -> bool:
     return _sfx_on
+
+
+def draw_debug_overlay(surface: pygame.Surface) -> None:
+    """Draw a small debug overlay showing the last SFX and current music track.
+    Visible for 4 seconds after each sound plays; always shows music track.
+    """
+    global _debug_font
+    if _debug_font is None:
+        try:
+            _debug_font = pygame.font.SysFont('Consolas', 13)
+        except Exception:
+            return
+
+    now = pygame.time.get_ticks()
+    h   = surface.get_height()
+    bg  = pygame.Surface((340, 36), pygame.SRCALPHA)
+    bg.fill((0, 0, 0, 160))
+    surface.blit(bg, (0, h - 36))
+
+    music_name = os.path.basename(_current_track) if _current_track else '(none)'
+    music_t = _debug_font.render(f'Music : {music_name}', True, (160, 200, 255))
+    surface.blit(music_t, (4, h - 34))
+
+    if now - _last_sfx_time < 4000 and _last_sfx_name:
+        age_ms  = now - _last_sfx_time
+        sfx_col = (255, 255, 0) if age_ms < 500 else (200, 200, 120)
+        sfx_t   = _debug_font.render(f'SFX   : {_last_sfx_name}.wav  ({age_ms} ms ago)',
+                                     True, sfx_col)
+        surface.blit(sfx_t, (4, h - 20))
+    else:
+        idle_t = _debug_font.render('SFX   : (silent)', True, (100, 100, 100))
+        surface.blit(idle_t, (4, h - 20))
