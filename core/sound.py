@@ -59,7 +59,6 @@ def init() -> None:
     _MUSIC_TRACKS = {
         'menu':        os.path.join(music_dir, 'menu.mp3'),
         'video_poker': os.path.join(music_dir, 'video_poker.mp3'),
-        'gameplay':    os.path.join(music_dir, 'gameplay.mp3'),
         'win':         os.path.join(music_dir, 'win.mp3'),
     }
 
@@ -89,22 +88,20 @@ def play(name: str) -> None:
 def play_music(context: str) -> None:
     """Start music for the given context.
 
-    'gameplay' starts a shuffled playlist if any tracks exist, otherwise
-    falls back to gameplay.mp3.  All other contexts play a single looping file.
-    Calling play_music('gameplay') while the playlist is already running is
-    a no-op so repeated calls from _start_hand() don't restart the playlist.
+    'gameplay' starts a shuffled playlist through the 6 tracks.
+    All other contexts play a single looping file.
+    Repeated play_music('gameplay') calls while the playlist is running are
+    no-ops so _start_hand() doesn't restart the playlist mid-game.
     """
     global _current_track, _playlist_active
     if not _music_on:
         return
 
     if context == 'gameplay':
-        if _playlist_paths:
-            if _playlist_active:
-                return  # already running — let it continue
-            _start_playlist()
-            return
-        # No playlist tracks found — fall through to gameplay.mp3
+        if _playlist_active:
+            return  # already running — let it continue
+        _start_playlist()
+        return
 
     # Non-playlist context: deactivate playlist and switch to a looping file
     _playlist_active = False
