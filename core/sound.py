@@ -1,5 +1,6 @@
 import os
 import sys
+import random
 import pygame
 
 _SFX: dict[str, pygame.mixer.Sound] = {}
@@ -9,6 +10,23 @@ _sfx_on        = True
 _current_track = ''
 _music_volume  = 0.3
 _sfx_volume    = 0.7
+
+# Playlist state for the gameplay shuffle pool
+_playlist_paths:  list[str] = []   # all found tracks
+_playlist_order:  list[str] = []   # current shuffled rotation
+_playlist_idx:    int  = 0
+_playlist_active: bool = False
+_MUSIC_END = pygame.USEREVENT + 1
+
+# Filenames (in assets/music/) that form the gameplay shuffle pool
+_PLAYLIST_FILENAMES = [
+    'ludwig_lullaby.mp3',
+    'bach_cello.mp3',
+    '10pm.mp3',
+    '10am.mp3',
+    '2am.mp3',
+    '2pm.mp3',
+]
 
 _SFX_NAMES = [
     'deal', 'flip', 'check', 'chip_collect',
@@ -27,7 +45,7 @@ def _asset_path(relative: str) -> str:
 
 def init() -> None:
     """Load all sounds. Call once after pygame.mixer.init()."""
-    global _MUSIC_TRACKS
+    global _MUSIC_TRACKS, _playlist_paths
     sounds_dir = _asset_path(os.path.join('assets', 'sounds'))
     for name in _SFX_NAMES:
         path = os.path.join(sounds_dir, f'{name}.wav')
@@ -41,9 +59,17 @@ def init() -> None:
     _MUSIC_TRACKS = {
         'menu':        os.path.join(music_dir, 'menu.mp3'),
         'video_poker': os.path.join(music_dir, 'video_poker.mp3'),
-        'gameplay':    os.path.join(music_dir, 'gameplay.mp3'),
         'win':         os.path.join(music_dir, 'win.mp3'),
     }
+
+    # Scan for playlist tracks (only those that actually exist)
+    _playlist_paths = [
+        os.path.join(music_dir, fname)
+        for fname in _PLAYLIST_FILENAMES
+        if os.path.exists(os.path.join(music_dir, fname))
+    ]
+
+    pygame.mixer.music.set_endevent(_MUSIC_END)
 
     try:
         pygame.mixer.music.set_volume(_music_volume)
@@ -60,10 +86,25 @@ def play(name: str) -> None:
 
 
 def play_music(context: str) -> None:
-    """Start looping music for given context. No-op if same track playing or music off."""
-    global _current_track
+    """Start music for the given context.
+
+    'gameplay' starts a shuffled playlist through the 6 tracks.
+    All other contexts play a single looping file.
+    Repeated play_music('gameplay') calls while the playlist is running are
+    no-ops so _start_hand() doesn't restart the playlist mid-game.
+    """
+    global _current_track, _playlist_active
     if not _music_on:
         return
+
+    if context == 'gameplay':
+        if _playlist_active:
+            return  # already running — let it continue
+        _start_playlist()
+        return
+
+    # Non-playlist context: deactivate playlist and switch to a looping file
+    _playlist_active = False
     path = _MUSIC_TRACKS.get(context, '')
     if not path or not os.path.exists(path):
         return
@@ -78,8 +119,44 @@ def play_music(context: str) -> None:
         pass
 
 
-def stop_music() -> None:
+def _start_playlist() -> None:
+    global _playlist_active, _playlist_idx, _playlist_order
+    _playlist_order  = _playlist_paths[:]
+    random.shuffle(_playlist_order)
+    _playlist_idx    = 0
+    _playlist_active = True
+    _play_playlist_track()
+
+
+def _play_playlist_track() -> None:
     global _current_track
+    if not _playlist_order:
+        return
+    path = _playlist_order[_playlist_idx]
+    try:
+        pygame.mixer.music.load(path)
+        pygame.mixer.music.set_volume(_music_volume)
+        pygame.mixer.music.play(0)   # play once; end-event fires when done
+        _current_track = path
+    except Exception:
+        pass
+
+
+def handle_event(event: pygame.event.Event) -> None:
+    """Call from each game's event loop to advance the playlist on track end."""
+    global _playlist_idx, _playlist_order
+    if event.type != _MUSIC_END or not _playlist_active or not _music_on:
+        return
+    _playlist_idx += 1
+    if _playlist_idx >= len(_playlist_order):
+        random.shuffle(_playlist_order)
+        _playlist_idx = 0
+    _play_playlist_track()
+
+
+def stop_music() -> None:
+    global _current_track, _playlist_active
+    _playlist_active = False   # clear before stop() to ignore the end-event
     try:
         pygame.mixer.music.stop()
     except Exception:

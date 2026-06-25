@@ -531,21 +531,19 @@ class FiveCardDraw:
                 draw_card(self.screen, card, cx, self._card_y,
                           self._font, self._marked[i])
 
-        if self._phase in ('draw', 'drawing'):
+        if self._phase == 'draw':
             for i in range(5):
-                if self._phase == 'drawing' and i in self._draw_indices and i not in revealed_set:
-                    continue  # card back — no label
                 label = 'DISCARD' if self._marked[i] else 'HOLD'
                 color = _RED if self._marked[i] else _GREEN
                 t = self._small.render(label, True, color)
                 self.screen.blit(t, t.get_rect(center=self._hold_rects[i].center))
 
-        # Live hand label below player cards (all active phases except result)
+        # Live hand label above player cards (all active phases except result/drawing)
         if self._hand and self._phase not in ('result', 'drawing'):
             rank = evaluate(self._hand)[0]
             ht = self._small.render(f'Your hand: {HAND_NAMES[rank]}', True, _GOLD)
             self.screen.blit(ht, ht.get_rect(
-                center=(self._w // 2, self._card_y + CARD_H + 18)))
+                center=(self._w // 2, self._card_y - 28)))
 
         # Back button
         pygame.draw.rect(self.screen, _GRAY, self._btn_back, border_radius=6)
