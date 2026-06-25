@@ -12,7 +12,6 @@ def main():
     pygame.init()
     pygame.mixer.init()
     sound.init()
-    sound.play('startup')
     sound.play_music('menu')
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption('Single Player Poker')

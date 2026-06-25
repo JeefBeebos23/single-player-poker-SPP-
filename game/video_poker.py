@@ -193,7 +193,6 @@ class VideoPoker:
         self._deck.shuffle()
         self._hand   = self._deck.deal(5)
         self._held   = [False] * 5
-        sound.play('deal')
         # Start deal animation: reveal cards one at a time
         self._anim_count   = 0
         self._anim_next_at = pygame.time.get_ticks() + _DEAL_DELAY_MS
@@ -216,7 +215,7 @@ class VideoPoker:
         else:
             self._result_msg = HAND_NAMES[rank_val]
         if won > 0:
-            self._result_sound = 'win_big' if rank_val == ROYAL_FLUSH else 'chip_collect'
+            self._result_sound = 'win_big'
         else:
             self._result_sound = 'lose'
 
@@ -319,5 +318,3 @@ class VideoPoker:
             pygame.draw.rect(self.screen, (30, 100, 60), self._deal_btn, border_radius=8)
             t = self._font.render('PLAY AGAIN', True, _WHITE)
             self.screen.blit(t, t.get_rect(center=self._deal_btn.center))
-
-        sound.draw_debug_overlay(self.screen)
