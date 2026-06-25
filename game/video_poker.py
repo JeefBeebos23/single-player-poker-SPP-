@@ -293,7 +293,7 @@ class VideoPoker:
                 t = self._small.render(label, True, color)
                 self.screen.blit(t, t.get_rect(center=self._hold_rects[i].center))
 
-        # Live hand label during holding phase
+        # Live hand label above cards during holding phase
         if self._phase == 'holding' and self._hand:
             rank, _ = evaluate(self._hand)
             name = HAND_NAMES[rank]
@@ -301,7 +301,7 @@ class VideoPoker:
                 name = 'Low Pair (no win)'
             ht = self._small.render(f'Your hand: {name}', True, _GOLD)
             self.screen.blit(ht, ht.get_rect(
-                center=(self._w // 2, self._card_y + CARD_H + 18)))
+                center=(self._w // 2, self._card_y - 28)))
 
         cx = self._w // 2
 
