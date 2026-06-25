@@ -11,8 +11,42 @@ _BLACK = (20, 20, 20)
 _SELECTED_BORDER = (255, 215, 0)
 _UNSELECTED_BORDER = (180, 180, 180)
 
-_SUIT_SYMBOLS = {'H': '♥', 'D': '♦', 'C': '♣', 'S': '♠'}
 _RANK_NAMES = {11: 'J', 12: 'Q', 13: 'K', 14: 'A'}
+
+
+def _draw_suit_shape(surface: pygame.Surface, suit: str,
+                     cx: int, cy: int, r: int, color: tuple) -> None:
+    """Draw a suit icon centered at (cx, cy); r is approx half-width."""
+    if r < 2:
+        return
+    if suit == 'D':
+        pts = [(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)]
+        pygame.draw.polygon(surface, color, pts)
+    elif suit == 'H':
+        cr = max(1, r * 6 // 10)
+        o  = max(1, r * 4 // 10)
+        pygame.draw.circle(surface, color, (cx - o, cy - o), cr)
+        pygame.draw.circle(surface, color, (cx + o, cy - o), cr)
+        pygame.draw.polygon(surface, color,
+                            [(cx - r, cy), (cx, cy + r), (cx + r, cy)])
+    elif suit == 'S':
+        cr = max(1, r * 6 // 10)
+        o  = max(1, r * 4 // 10)
+        pygame.draw.circle(surface, color, (cx - o, cy + o), cr)
+        pygame.draw.circle(surface, color, (cx + o, cy + o), cr)
+        pygame.draw.polygon(surface, color,
+                            [(cx - r, cy), (cx, cy - r), (cx + r, cy)])
+        sw = max(1, r // 3)
+        pygame.draw.rect(surface, color,
+                         pygame.Rect(cx - sw, cy + o, sw * 2, max(1, r // 2)))
+    elif suit == 'C':
+        cr = max(1, r * 5 // 10)
+        pygame.draw.circle(surface, color, (cx, cy - cr // 2), cr)
+        pygame.draw.circle(surface, color, (cx - cr, cy + cr // 2), cr)
+        pygame.draw.circle(surface, color, (cx + cr, cy + cr // 2), cr)
+        sw = max(1, r // 3)
+        pygame.draw.rect(surface, color,
+                         pygame.Rect(cx - sw, cy + cr // 2, sw * 2, max(1, r // 2)))
 
 
 def draw_card(surface: pygame.Surface, card, x: int, y: int,
@@ -25,13 +59,19 @@ def draw_card(surface: pygame.Surface, card, x: int, y: int,
 
     color = _RED if card.suit in ('H', 'D') else _BLACK
     rank_str = _RANK_NAMES.get(card.rank, str(card.rank))
-    suit_str = _SUIT_SYMBOLS[card.suit]
 
-    corner = font.render(f'{rank_str}{suit_str}', True, color)
-    surface.blit(corner, (x + 5, y + 5))
+    # Corner: rank text + small suit shape
+    rank_surf = font.render(rank_str, True, color)
+    surface.blit(rank_surf, (x + 5, y + 5))
+    fh = rank_surf.get_height()
+    fw = rank_surf.get_width()
+    sr = max(4, fh // 4)
+    _draw_suit_shape(surface, card.suit,
+                     x + 5 + fw + sr + 2, y + 5 + fh // 2, sr, color)
 
-    center_suit = font.render(suit_str, True, color)
-    surface.blit(center_suit, center_suit.get_rect(center=(x + CARD_W // 2, y + CARD_H // 2)))
+    # Center: larger suit shape
+    _draw_suit_shape(surface, card.suit,
+                     x + CARD_W // 2, y + CARD_H // 2, 14, color)
 
 
 def draw_card_back(surface: pygame.Surface, x: int, y: int) -> None:

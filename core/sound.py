@@ -13,6 +13,7 @@ _sfx_volume    = 0.7
 _SFX_NAMES = [
     'deal', 'flip', 'check', 'chip_bet', 'chip_collect',
     'win_big', 'lose', 'click', 'fold', 'bubble_pop', 'startup',
+    'raise', 'all_in',
 ]
 
 

@@ -79,6 +79,10 @@ class VideoPoker:
             pygame.Rect(card_start_x + i * (CARD_W + self._CARD_GAP), card_y + CARD_H + 10, CARD_W, 30)
             for i in range(5)
         ]
+        self._card_rects = [
+            pygame.Rect(card_start_x + i * (CARD_W + self._CARD_GAP), card_y, CARD_W, CARD_H)
+            for i in range(5)
+        ]
         cx = self._w // 2
         self._deal_btn = pygame.Rect(cx - bw // 2, card_y + CARD_H + 55, bw, bh)
         self._bet_up = pygame.Rect(cx + 90, self._h - 80, 40, 36)
@@ -115,9 +119,10 @@ class VideoPoker:
                 self._bet = max(self._MIN_BET, self._bet - self._BET_STEP)
 
         elif self._phase == 'holding':
-            for i, rect in enumerate(self._hold_rects):
-                if rect.collidepoint(pos):
+            for i in range(5):
+                if self._hold_rects[i].collidepoint(pos) or self._card_rects[i].collidepoint(pos):
                     self._held[i] = not self._held[i]
+                    sound.play('click')
             if self._deal_btn.collidepoint(pos):
                 self._draw_phase()
 
