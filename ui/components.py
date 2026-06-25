@@ -22,11 +22,16 @@ class Button:
                 return True
         return False
 
-    def draw(self, surface: pygame.Surface) -> None:
-        color = _BUTTON_HOVER if self._hovered else _BUTTON_COLOR
+    def draw(self, surface: pygame.Surface, selected: bool = False) -> None:
+        if selected:
+            color = _GOLD
+            text_color = (20, 20, 20)
+        else:
+            color = _BUTTON_HOVER if self._hovered else _BUTTON_COLOR
+            text_color = _BUTTON_TEXT
         pygame.draw.rect(surface, color, self.rect, border_radius=8)
         pygame.draw.rect(surface, _GOLD, self.rect, 2, border_radius=8)
-        text = self.font.render(self.label, True, _BUTTON_TEXT)
+        text = self.font.render(self.label, True, text_color)
         surface.blit(text, text.get_rect(center=self.rect.center))
 
 

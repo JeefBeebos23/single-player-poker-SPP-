@@ -71,6 +71,8 @@ class HoldEm:
         self._community: list[Card] = []
         self._pot        = 0
         self._cur_bet    = 0
+        self._hand_start_balance:    int       = 0
+        self._hand_start_ai_stacks:  list[int] = [0] * num_ai
         self._raise_amt  = _RAISE_STEP
         self._phase      = 'pre_flop'
         self._phase_idx  = 0
@@ -92,6 +94,10 @@ class HoldEm:
         # Raise-response state: player must respond to an AI raise
         self._player_must_respond: bool = False
         self._street_raise_count:  int  = 0
+
+        # Raise amount typing state
+        self._typing_raise: bool = False
+        self._raise_input:  str  = ''
 
         # Layout
         comm_y = self._h // 2 - CARD_H // 2
@@ -125,6 +131,10 @@ class HoldEm:
         self._ai_active = [True] * self._num_ai
         self._raise_amt = _RAISE_STEP
         self._result_hand_lines = []
+
+        # Snapshot starting chips so we can display per-player bets
+        self._hand_start_balance   = self.balance
+        self._hand_start_ai_stacks = list(self._ai_stacks)
 
         self._deck = Deck()
         self._deck.shuffle()
@@ -168,6 +178,8 @@ class HoldEm:
                 sound.handle_event(event)
                 if event.type == pygame.QUIT:
                     self._running = False
+                elif event.type == pygame.KEYDOWN and self._typing_raise:
+                    self._handle_raise_key(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._game_phase != 'ai_turn':
                         self._handle_click(event.pos)
@@ -194,7 +206,30 @@ class HoldEm:
     # Input
     # ------------------------------------------------------------------
 
+    def _handle_raise_key(self, event: pygame.event.Event) -> None:
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self._commit_raise_input()
+        elif event.key == pygame.K_ESCAPE:
+            self._typing_raise = False
+            self._raise_input = ''
+        elif event.key == pygame.K_BACKSPACE:
+            self._raise_input = self._raise_input[:-1]
+        elif event.unicode.isdigit():
+            self._raise_input += event.unicode
+
+    def _commit_raise_input(self) -> None:
+        try:
+            amount = int(self._raise_input)
+            self._raise_amt = max(_RAISE_STEP, min(amount, self.balance))
+        except ValueError:
+            pass
+        self._typing_raise = False
+        self._raise_input = ''
+
     def _handle_click(self, pos: tuple) -> None:
+        if self._typing_raise and not self._btn_raise.collidepoint(pos):
+            self._commit_raise_input()
+
         if self._btn_back.collidepoint(pos):
             self._running = False
             return
@@ -215,7 +250,12 @@ class HoldEm:
             elif self._btn_plus.collidepoint(pos):
                 self._raise_amt = min(self.balance, self._raise_amt + _RAISE_STEP)
             elif self._btn_raise.collidepoint(pos):
-                self._player_raise()
+                if self._typing_raise:
+                    self._commit_raise_input()
+                    self._player_raise()
+                else:
+                    self._typing_raise = True
+                    self._raise_input = str(self._raise_amt)
             elif self._btn_allin.collidepoint(pos):
                 self._player_all_in()
 
@@ -348,6 +388,7 @@ class HoldEm:
         if not active:
             sound.stop_music()
             sound.play('win_big')
+            sound.play_music_once('celebration')
             self.balance += self._pot
             self._result_msg = f'All opponents folded!  You win ${self._pot}.'
             self._pot = 0
@@ -356,7 +397,8 @@ class HoldEm:
             return
 
         # If AI raised and player hasn't had a response chance this street yet
-        if self._cur_bet > bet_before and self._street_raise_count == 0:
+        # Skip if player is already all-in (balance=0) — they can't respond
+        if self._cur_bet > bet_before and self._street_raise_count == 0 and self.balance > 0:
             self._street_raise_count  = 1
             self._player_must_respond = True
             self._game_phase      = 'betting'
@@ -429,6 +471,7 @@ class HoldEm:
             self.balance    += self._pot
             self._result_msg = f'You win!  {player_hand_name} — +${self._pot}'
             sound.play('win_big')
+            sound.play_music_once('celebration')
             self._fire_dialogue('lose_big')
         else:
             self._ai_stacks[winner] += self._pot
@@ -472,20 +515,23 @@ class HoldEm:
         title = self._font.render("TEXAS HOLD'EM", True, _GOLD)
         self.screen.blit(title, title.get_rect(center=(self._w // 2, 40)))
 
+        player_bet = self._hand_start_balance - self.balance
         bal = self._small.render(
-            f'Balance: ${self.balance:,}  Pot: ${self._pot:,}', True, _WHITE)
+            f'Balance: ${self.balance:,}   Pot: ${self._pot:,}   Bet: ${player_bet:,}',
+            True, _WHITE)
         self.screen.blit(bal, bal.get_rect(center=(self._w // 2, 75)))
 
         # Opponents
         for i, p in enumerate(self._opponents):
             sx    = self._opp_xs[i]
             color = _WHITE if self._ai_active[i] else _GRAY
+            ai_bet = self._hand_start_ai_stacks[i] - self._ai_stacks[i]
             self.screen.blit(
                 self._small.render(p.name, True, color),
                 self._small.render(p.name, True, color).get_rect(center=(sx, 110)))
             self.screen.blit(
-                self._small.render(f'${self._ai_stacks[i]:,}', True, color),
-                self._small.render(f'${self._ai_stacks[i]:,}', True, color)
+                self._small.render(f'${self._ai_stacks[i]:,}  (Bet: ${ai_bet:,})', True, color),
+                self._small.render(f'${self._ai_stacks[i]:,}  (Bet: ${ai_bet:,})', True, color)
                     .get_rect(center=(sx, 130)))
             if self._ai_active[i] and self._ai_hands[i]:
                 for j in range(2):
@@ -539,7 +585,12 @@ class HoldEm:
             else:
                 self._draw_btn(self._btn_call, f'Call ${self._cur_bet}', _GREEN)
             self._draw_btn(self._btn_minus, '−', _GRAY)
-            self._draw_btn(self._btn_raise, f'Raise ${self._raise_amt}', _GOLD)
+            if self._typing_raise:
+                self._draw_btn(self._btn_raise,
+                               f'${self._raise_input}|' if self._raise_input else '$|',
+                               _WHITE)
+            else:
+                self._draw_btn(self._btn_raise, f'Raise ${self._raise_amt}', _GOLD)
             self._draw_btn(self._btn_plus,  '+', _GRAY)
             self._draw_btn(self._btn_allin, 'All In', _RED)
 
