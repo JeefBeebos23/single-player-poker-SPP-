@@ -131,6 +131,7 @@ class VideoPoker:
                 self._phase = 'betting'
                 self._hand = []
                 self._held = [False] * 5
+                sound.play_music('video_poker')
 
     def _deal_initial(self) -> None:
         self.balance -= self._bet
@@ -164,6 +165,7 @@ class VideoPoker:
                 sound.play('chip_collect')
         else:
             sound.play('lose')
+        sound.stop_music()
         self._phase = 'result'
 
     def _draw(self) -> None:
