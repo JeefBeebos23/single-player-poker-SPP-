@@ -16,7 +16,7 @@ _last_sfx_time = 0      # ms timestamp of last play() call
 _debug_font    = None   # initialised lazily (needs pygame display)
 
 _SFX_NAMES = [
-    'deal', 'flip', 'check', 'chip_bet', 'chip_collect',
+    'deal', 'flip', 'check', 'chip_collect',
     'win_big', 'lose', 'click', 'fold', 'bubble_pop', 'startup',
     'raise',
 ]
