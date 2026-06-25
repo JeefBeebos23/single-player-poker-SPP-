@@ -383,7 +383,7 @@ class FiveCardDraw:
         if winner == 'player':
             self.balance     += self._pot
             self._result_msg  = f'You win!  {HAND_NAMES[player_score[0]]} — +${self._pot}'
-            sound.play('chip_collect')
+            sound.play('win_big')
             self._fire_dialogue('lose_big')
         else:
             self._ai_stacks[winner] += self._pot
@@ -515,8 +515,6 @@ class FiveCardDraw:
         if self._message and self._phase not in ('result',):
             msg_t = self._small.render(self._message, True, _WHITE)
             self.screen.blit(msg_t, msg_t.get_rect(center=(self._w // 2, self._h - 100)))
-
-        sound.draw_debug_overlay(self.screen)
 
     def _draw_btn(self, rect: pygame.Rect, label: str, color: tuple) -> None:
         pygame.draw.rect(self.screen, color, rect, border_radius=8)

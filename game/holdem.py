@@ -315,6 +315,7 @@ class HoldEm:
         active = [i for i in range(_N_AI) if self._ai_active[i]]
         if not active:
             sound.stop_music()
+            sound.play('win_big')
             self.balance += self._pot
             self._result_msg = f'All opponents folded!  You win ${self._pot}.'
             self._pot = 0
@@ -371,7 +372,7 @@ class HoldEm:
         if winner == 'player':
             self.balance    += self._pot
             self._result_msg = f'You win!  {HAND_NAMES[player_score[0]]} — +${self._pot}'
-            sound.play('chip_collect')
+            sound.play('win_big')
             self._fire_dialogue('lose_big')
         else:
             self._ai_stacks[winner] += self._pot
@@ -514,7 +515,6 @@ class HoldEm:
             self.screen.blit(msg_t,
                              msg_t.get_rect(center=(self._w // 2, self._h - 100)))
 
-        sound.draw_debug_overlay(self.screen)
 
     def _draw_btn(self, rect: pygame.Rect, label: str, color: tuple) -> None:
         pygame.draw.rect(self.screen, color, rect, border_radius=8)
