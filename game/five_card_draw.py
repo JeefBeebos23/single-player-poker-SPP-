@@ -164,6 +164,7 @@ class FiveCardDraw:
     def run(self) -> int:
         while self._running:
             for event in pygame.event.get():
+                sound.handle_event(event)
                 if event.type == pygame.QUIT:
                     self._running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
