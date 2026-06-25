@@ -79,3 +79,4 @@ class Menu:
         self._slider.draw(self.screen)
         self._slider_music.draw(self.screen)
         self._slider_sfx.draw(self.screen)
+        sound.draw_debug_overlay(self.screen)

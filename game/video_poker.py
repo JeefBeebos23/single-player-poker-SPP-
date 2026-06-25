@@ -319,3 +319,5 @@ class VideoPoker:
             pygame.draw.rect(self.screen, (30, 100, 60), self._deal_btn, border_radius=8)
             t = self._font.render('PLAY AGAIN', True, _WHITE)
             self.screen.blit(t, t.get_rect(center=self._deal_btn.center))
+
+        sound.draw_debug_overlay(self.screen)
