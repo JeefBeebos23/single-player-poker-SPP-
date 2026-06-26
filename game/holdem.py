@@ -7,6 +7,7 @@ from ai.engine import decide
 from ai.dialogue import get_line
 from ui.renderer import draw_card, draw_card_back, CARD_W, CARD_H
 from ui.speech_bubble import SpeechBubble
+from core.window import S, toggle_borderless
 import core.sound as sound
 
 _GOLD  = (245, 200, 66)
@@ -49,9 +50,9 @@ class HoldEm:
         self.balance = balance
         self.difficulty = difficulty
         self._w, self._h = screen.get_size()
-        self._font        = pygame.font.SysFont('Georgia', 24, bold=True)
-        self._font_banner = pygame.font.SysFont('Georgia', 40, bold=True)
-        self._small       = pygame.font.SysFont('Georgia', 18)
+        self._font        = pygame.font.SysFont('Georgia', S(24), bold=True)
+        self._font_banner = pygame.font.SysFont('Georgia', S(40), bold=True)
+        self._small       = pygame.font.SysFont('Georgia', S(18))
 
         self._num_ai    = num_ai
         self._opponents = generate_opponents(num_ai, difficulty)
@@ -65,7 +66,7 @@ class HoldEm:
         else:
             self._opp_xs = [self._w // 4, 3 * self._w // 4]
             bubble_xs    = [self._w // 4, 3 * self._w // 4]
-        self._bubbles = [SpeechBubble(x, 80, self._small) for x in bubble_xs]
+        self._bubbles = [SpeechBubble(x, S(80), self._small) for x in bubble_xs]
 
         self._hole:      list[Card] = []
         self._community: list[Card] = []
@@ -100,24 +101,26 @@ class HoldEm:
         self._raise_input:  str  = ''
 
         # Layout
-        comm_y = self._h // 2 - CARD_H // 2
-        comm_x = (self._w - (5 * CARD_W + 4 * 10)) // 2
-        self._comm_positions = [(comm_x + i * (CARD_W + 10), comm_y) for i in range(5)]
-        self._hole_xs = [self._w // 2 - CARD_W - 5, self._w // 2 + 5]
-        self._hole_y  = self._h // 2 + CARD_H // 2 + 30
+        self._cw = S(CARD_W)
+        self._ch = S(CARD_H)
+        comm_y = self._h // 2 - self._ch // 2
+        comm_x = (self._w - (5 * self._cw + 4 * S(10))) // 2
+        self._comm_positions = [(comm_x + i * (self._cw + S(10)), comm_y) for i in range(5)]
+        self._hole_xs = [self._w // 2 - self._cw - S(5), self._w // 2 + S(5)]
+        self._hole_y  = self._h // 2 + self._ch // 2 + S(30)
 
         cx = self._w // 2
-        by = self._h - 70
+        by = self._h - S(70)
         # Button layout: Fold | Check/Call | [-] Raise $X [+] | All In
-        self._btn_fold  = pygame.Rect(cx - 290, by, 110, 40)
-        self._btn_check = pygame.Rect(cx - 168, by, 115, 40)
-        self._btn_call  = pygame.Rect(cx - 168, by, 115, 40)
-        self._btn_minus = pygame.Rect(cx - 42,  by,  28, 40)
-        self._btn_raise = pygame.Rect(cx - 6,   by, 110, 40)
-        self._btn_plus  = pygame.Rect(cx + 112, by,  28, 40)
-        self._btn_allin = pygame.Rect(cx + 148, by,  80, 40)
-        self._btn_back  = pygame.Rect(30, 30, 100, 36)
-        self._btn_next  = pygame.Rect(cx - 75, by, 150, 40)
+        self._btn_fold  = pygame.Rect(cx - S(290), by, S(110), S(40))
+        self._btn_check = pygame.Rect(cx - S(168), by, S(115), S(40))
+        self._btn_call  = pygame.Rect(cx - S(168), by, S(115), S(40))
+        self._btn_minus = pygame.Rect(cx - S(42),  by,  S(28), S(40))
+        self._btn_raise = pygame.Rect(cx - S(6),   by, S(110), S(40))
+        self._btn_plus  = pygame.Rect(cx + S(112), by,  S(28), S(40))
+        self._btn_allin = pygame.Rect(cx + S(148), by,  S(80), S(40))
+        self._btn_back  = pygame.Rect(S(30), S(30), S(100), S(36))
+        self._btn_next  = pygame.Rect(cx - S(75), by, S(150), S(40))
 
         self._start_hand()
 
@@ -180,7 +183,7 @@ class HoldEm:
                     self._running = False
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_F11:
-                        pygame.display.toggle_fullscreen()
+                        toggle_borderless()
                     elif self._typing_raise:
                         self._handle_raise_key(event)
                     elif (event.unicode.isdigit()
@@ -516,13 +519,13 @@ class HoldEm:
     def _draw(self) -> None:
         self.screen.fill(_FELT)
         title = self._font.render("TEXAS HOLD'EM", True, _GOLD)
-        self.screen.blit(title, title.get_rect(center=(self._w // 2, 40)))
+        self.screen.blit(title, title.get_rect(center=(self._w // 2, S(40))))
 
         player_bet = self._hand_start_balance - self.balance
         bal = self._small.render(
             f'Balance: ${self.balance:,}   Pot: ${self._pot:,}   Bet: ${player_bet:,}',
             True, _WHITE)
-        self.screen.blit(bal, bal.get_rect(center=(self._w // 2, 75)))
+        self.screen.blit(bal, bal.get_rect(center=(self._w // 2, S(75))))
 
         # Opponents
         for i, p in enumerate(self._opponents):
@@ -531,28 +534,31 @@ class HoldEm:
             ai_bet = self._hand_start_ai_stacks[i] - self._ai_stacks[i]
             self.screen.blit(
                 self._small.render(p.name, True, color),
-                self._small.render(p.name, True, color).get_rect(center=(sx, 110)))
+                self._small.render(p.name, True, color).get_rect(center=(sx, S(110))))
             self.screen.blit(
                 self._small.render(f'${self._ai_stacks[i]:,}  (Bet: ${ai_bet:,})', True, color),
                 self._small.render(f'${self._ai_stacks[i]:,}  (Bet: ${ai_bet:,})', True, color)
-                    .get_rect(center=(sx, 130)))
+                    .get_rect(center=(sx, S(130))))
             if self._ai_active[i] and self._ai_hands[i]:
                 for j in range(2):
-                    bx = sx - CARD_W - 4 + j * (CARD_W + 8)
+                    bx = sx - self._cw - S(4) + j * (self._cw + S(8))
                     if self._game_phase == 'result':
-                        draw_card(self.screen, self._ai_hands[i][j], bx, 148, self._font)
+                        draw_card(self.screen, self._ai_hands[i][j], bx, S(148),
+                                  self._font, cw=self._cw, ch=self._ch)
                     else:
-                        draw_card_back(self.screen, bx, 148)
+                        draw_card_back(self.screen, bx, S(148), cw=self._cw, ch=self._ch)
             self._bubbles[i].draw(self.screen)
 
         # Community cards
         for idx, (x, y) in enumerate(self._comm_positions):
             if idx < len(self._community):
-                draw_card(self.screen, self._community[idx], x, y, self._font)
+                draw_card(self.screen, self._community[idx], x, y,
+                          self._font, cw=self._cw, ch=self._ch)
 
         # Hole cards
         for i, card in enumerate(self._hole):
-            draw_card(self.screen, card, self._hole_xs[i], self._hole_y, self._font)
+            draw_card(self.screen, card, self._hole_xs[i], self._hole_y,
+                      self._font, cw=self._cw, ch=self._ch)
 
         # Live hand label — always visible once ≥5 cards are available
         if self._hole and self._game_phase not in ('result',) and \
@@ -560,7 +566,7 @@ class HoldEm:
             rank, _ = best_hand(self._hole + self._community)
             ht = self._small.render(f'Your hand: {HAND_NAMES[rank]}', True, _GOLD)
             self.screen.blit(ht, ht.get_rect(
-                center=(self._w // 2, self._hole_y + CARD_H + 18)))
+                center=(self._w // 2, self._hole_y + self._ch + S(18))))
 
         # Phase label (above community cards)
         phase_label = _PHASE_LABELS.get(self._phase, '')
@@ -569,7 +575,7 @@ class HoldEm:
             self.screen.blit(
                 pt,
                 pt.get_rect(center=(self._w // 2,
-                                    self._h // 2 - CARD_H // 2 - 25)))
+                                    self._h // 2 - self._ch // 2 - S(25))))
 
         # Back button
         pygame.draw.rect(self.screen, _GRAY, self._btn_back, border_radius=6)
@@ -599,7 +605,7 @@ class HoldEm:
 
             # "Your Turn" flash after AI acts
             if now < self._your_turn_until:
-                self._draw_overlay_label('Your Turn', _GREEN, self._h // 2 - 20)
+                self._draw_overlay_label('Your Turn', _GREEN, self._h // 2 - S(20))
 
             # Phase transition banner (FLOP / TURN / RIVER)
             if now < self._phase_banner_until:
@@ -611,25 +617,25 @@ class HoldEm:
                 elapsed = now - self._ai_action_start
                 if elapsed < 500:
                     label = f"{p.name}'s Turn"
-                    self._draw_overlay_label(label, _WHITE, self._h // 2 - 20)
+                    self._draw_overlay_label(label, _WHITE, self._h // 2 - S(20))
                 else:
                     label = f'{p.name}: {_ACTION_LABELS.get(action, action)}'
-                    self._draw_overlay_label(label, _GOLD, self._h // 2 - 20)
+                    self._draw_overlay_label(label, _GOLD, self._h // 2 - S(20))
 
         elif self._game_phase == 'result':
-            r_y = self._hole_y + CARD_H + 30
+            r_y = self._hole_y + self._ch + S(30)
             r   = self._font.render(self._result_msg, True, _GOLD)
             r_rect = r.get_rect(center=(self._w // 2, r_y))
-            bg = r_rect.inflate(24, 12)
-            pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
-            pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
+            bg = r_rect.inflate(S(24), S(12))
+            pygame.draw.rect(self.screen, _BOX, bg, border_radius=S(8))
+            pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=S(8))
             self.screen.blit(r, r_rect)
 
-            # Per-player hand list (item 1)
+            # Per-player hand list
             for k, line in enumerate(self._result_hand_lines):
                 ht = self._small.render(line, True, _WHITE)
                 self.screen.blit(ht, ht.get_rect(
-                    center=(self._w // 2, r_y + 30 + k * 22)))
+                    center=(self._w // 2, r_y + S(30) + k * S(22))))
 
             label = 'Game Over' if self.balance <= 0 else 'Next Hand'
             col   = _GRAY if self.balance <= 0 else _GREEN
@@ -639,28 +645,26 @@ class HoldEm:
         if self._game_phase not in ('result',) and self._message:
             msg_t = self._small.render(self._message, True, _WHITE)
             self.screen.blit(msg_t,
-                             msg_t.get_rect(center=(self._w // 2, self._h - 100)))
+                             msg_t.get_rect(center=(self._w // 2, self._h - S(100))))
 
 
     def _draw_btn(self, rect: pygame.Rect, label: str, color: tuple) -> None:
-        pygame.draw.rect(self.screen, color, rect, border_radius=8)
+        pygame.draw.rect(self.screen, color, rect, border_radius=S(8))
         t = self._small.render(label, True, _WHITE if color != _GOLD else _DARK)
         self.screen.blit(t, t.get_rect(center=rect.center))
 
     def _draw_overlay_label(self, text: str, color: tuple, cy: int) -> None:
-        """Draw a text label with a dark backing box centered at (cx, cy)."""
         t    = self._font.render(text, True, color)
         rect = t.get_rect(center=(self._w // 2, cy))
-        bg   = rect.inflate(24, 10)
-        pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
-        pygame.draw.rect(self.screen, color, bg, 2, border_radius=8)
+        bg   = rect.inflate(S(24), S(10))
+        pygame.draw.rect(self.screen, _BOX, bg, border_radius=S(8))
+        pygame.draw.rect(self.screen, color, bg, 2, border_radius=S(8))
         self.screen.blit(t, rect)
 
     def _draw_phase_banner(self, text: str) -> None:
-        """Draw a large centred phase transition banner."""
         t    = self._font_banner.render(text, True, _GOLD)
         rect = t.get_rect(center=(self._w // 2, self._h // 2))
-        bg   = rect.inflate(60, 30)
-        pygame.draw.rect(self.screen, _BOX, bg, border_radius=14)
-        pygame.draw.rect(self.screen, _GOLD, bg, 3, border_radius=14)
+        bg   = rect.inflate(S(60), S(30))
+        pygame.draw.rect(self.screen, _BOX, bg, border_radius=S(14))
+        pygame.draw.rect(self.screen, _GOLD, bg, max(2, S(3)), border_radius=S(14))
         self.screen.blit(t, rect)

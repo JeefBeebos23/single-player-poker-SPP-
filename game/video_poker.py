@@ -8,6 +8,7 @@ from core.hand_evaluator import (
 )
 from core.modifiers import ModifierSet
 from ui.renderer import draw_card, draw_card_back, CARD_W, CARD_H
+from core.window import S, toggle_borderless
 import core.sound as sound
 
 _PAYTABLE = {
@@ -78,8 +79,8 @@ class VideoPoker:
         self.balance = balance
         self.modifiers = modifiers
 
-        self._font  = pygame.font.SysFont('Georgia', 24, bold=True)
-        self._small = pygame.font.SysFont('Georgia', 18)
+        self._font  = pygame.font.SysFont('Georgia', S(24), bold=True)
+        self._small = pygame.font.SysFont('Georgia', S(18))
         self._w, self._h = screen.get_size()
 
         self._bet  = self._MIN_BET
@@ -101,26 +102,30 @@ class VideoPoker:
         self._draw_indices: list[int] = []  # indices being replaced in draw phase
         self._result_sound  = ''  # sound to play when draw animation finishes
 
-        card_start_x = (self._w - (5 * CARD_W + 4 * self._CARD_GAP)) // 2
-        card_y       = self._h // 2 - CARD_H // 2
+        self._cw = S(CARD_W)
+        self._ch = S(CARD_H)
+        card_gap = S(self._CARD_GAP)
+        card_start_x = (self._w - (5 * self._cw + 4 * card_gap)) // 2
+        card_y       = self._h // 2 - self._ch // 2
         self._hold_rects = [
-            pygame.Rect(card_start_x + i * (CARD_W + self._CARD_GAP),
-                        card_y + CARD_H + 10, CARD_W, 30)
+            pygame.Rect(card_start_x + i * (self._cw + card_gap),
+                        card_y + self._ch + S(10), self._cw, S(30))
             for i in range(5)
         ]
         self._card_rects = [
-            pygame.Rect(card_start_x + i * (CARD_W + self._CARD_GAP),
-                        card_y, CARD_W, CARD_H)
+            pygame.Rect(card_start_x + i * (self._cw + card_gap),
+                        card_y, self._cw, self._ch)
             for i in range(5)
         ]
         cx = self._w // 2
-        self._deal_btn  = pygame.Rect(cx - 55, card_y + CARD_H + 55, 110, 40)
-        self._bet_up    = pygame.Rect(cx + 90,  self._h - 80, 40, 36)
-        self._bet_dn    = pygame.Rect(cx + 140, self._h - 80, 40, 36)
-        self._bet_rect  = pygame.Rect(cx - 70,  self._h - 82, 140, 36)
-        self._back_btn  = pygame.Rect(30, 30, 100, 36)
+        self._deal_btn  = pygame.Rect(cx - S(55), card_y + self._ch + S(55), S(110), S(40))
+        self._bet_up    = pygame.Rect(cx + S(90),  self._h - S(80), S(40), S(36))
+        self._bet_dn    = pygame.Rect(cx + S(140), self._h - S(80), S(40), S(36))
+        self._bet_rect  = pygame.Rect(cx - S(70),  self._h - S(82), S(140), S(36))
+        self._back_btn  = pygame.Rect(S(30), S(30), S(100), S(36))
         self._card_start_x = card_start_x
         self._card_y = card_y
+        self._card_gap = card_gap
 
         sound.play_music('video_poker')
 
@@ -136,7 +141,7 @@ class VideoPoker:
                     running = False
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_F11:
-                        pygame.display.toggle_fullscreen()
+                        toggle_borderless()
                     elif self._typing_bet:
                         self._handle_bet_key(event)
                     elif (event.unicode.isdigit()
@@ -293,12 +298,12 @@ class VideoPoker:
         self.screen.fill(_FELT)
 
         title = self._font.render('VIDEO POKER — Jacks or Better', True, _GOLD)
-        self.screen.blit(title, title.get_rect(center=(self._w // 2, 50)))
+        self.screen.blit(title, title.get_rect(center=(self._w // 2, S(50))))
 
         bal = self._small.render(f'Balance: ${self.balance:,}', True, _WHITE)
-        self.screen.blit(bal, (self._w - 200, 20))
+        self.screen.blit(bal, (self._w - S(200), S(20)))
 
-        pygame.draw.rect(self.screen, _GRAY, self._back_btn, border_radius=6)
+        pygame.draw.rect(self.screen, _GRAY, self._back_btn, border_radius=S(6))
         back_t = self._small.render('← Menu', True, _WHITE)
         self.screen.blit(back_t, back_t.get_rect(center=self._back_btn.center))
 
@@ -311,21 +316,26 @@ class VideoPoker:
         ) if self._phase == 'drawing' else set()
 
         for i, card in enumerate(self._hand):
-            x = self._card_start_x + i * (CARD_W + self._CARD_GAP)
+            x = self._card_start_x + i * (self._cw + self._card_gap)
             if self._phase == 'dealing':
                 if i < self._anim_count:
-                    draw_card(self.screen, card, x, self._card_y, self._font)
+                    draw_card(self.screen, card, x, self._card_y, self._font,
+                              cw=self._cw, ch=self._ch)
                 else:
-                    draw_card_back(self.screen, x, self._card_y)
+                    draw_card_back(self.screen, x, self._card_y,
+                                   cw=self._cw, ch=self._ch)
             elif self._phase == 'drawing':
                 if self._held[i] or i in revealed_draw:
                     draw_card(self.screen, card, x, self._card_y,
-                              self._font, self._held[i])
+                              self._font, self._held[i],
+                              cw=self._cw, ch=self._ch)
                 else:
-                    draw_card_back(self.screen, x, self._card_y)
+                    draw_card_back(self.screen, x, self._card_y,
+                                   cw=self._cw, ch=self._ch)
             elif self._phase in ('holding', 'result'):
                 draw_card(self.screen, card, x, self._card_y,
-                          self._font, self._held[i])
+                          self._font, self._held[i],
+                          cw=self._cw, ch=self._ch)
             # 'betting': no cards
 
             # Hold/Discard labels (holding phase only)
@@ -343,7 +353,7 @@ class VideoPoker:
                 name = 'Low Pair (no win)'
             ht = self._small.render(f'Your hand: {name}', True, _GOLD)
             self.screen.blit(ht, ht.get_rect(
-                center=(self._w // 2, self._card_y - 28)))
+                center=(self._w // 2, self._card_y - S(28))))
 
         cx = self._w // 2
 
@@ -353,29 +363,31 @@ class VideoPoker:
         else:
             bet_label = f'Bet: ${self._bet}'
         bet_t = self._font.render(bet_label, True, _GOLD)
-        self.screen.blit(bet_t, bet_t.get_rect(center=(cx, self._h - 65)))
+        self.screen.blit(bet_t, bet_t.get_rect(center=(cx, self._h - S(65))))
 
         # Phase buttons
         if self._phase == 'betting':
             can_deal  = self.balance >= self._bet
             btn_color = (30, 100, 60) if can_deal else _GRAY
-            pygame.draw.rect(self.screen, btn_color, self._deal_btn, border_radius=8)
+            pygame.draw.rect(self.screen, btn_color, self._deal_btn, border_radius=S(8))
             t = self._font.render('DEAL', True, _WHITE)
             self.screen.blit(t, t.get_rect(center=self._deal_btn.center))
             if not can_deal:
                 msg = self._small.render('Insufficient funds', True, _RED_WIN)
                 self.screen.blit(msg, msg.get_rect(
-                    center=(cx, self._deal_btn.bottom + 18)))
-            pygame.draw.rect(self.screen, (30, 100, 60), self._bet_up, border_radius=4)
-            self.screen.blit(self._small.render('+', True, _WHITE), self._bet_up.move(12, 8))
-            pygame.draw.rect(self.screen, (30, 100, 60), self._bet_dn, border_radius=4)
-            self.screen.blit(self._small.render('-', True, _WHITE), self._bet_dn.move(14, 8))
+                    center=(cx, self._deal_btn.bottom + S(18))))
+            pygame.draw.rect(self.screen, (30, 100, 60), self._bet_up, border_radius=S(4))
+            self.screen.blit(self._small.render('+', True, _WHITE),
+                             self._bet_up.move(S(12), S(8)))
+            pygame.draw.rect(self.screen, (30, 100, 60), self._bet_dn, border_radius=S(4))
+            self.screen.blit(self._small.render('-', True, _WHITE),
+                             self._bet_dn.move(S(14), S(8)))
 
         elif self._phase in ('dealing', 'drawing'):
             pass  # no buttons during animation
 
         elif self._phase == 'holding':
-            pygame.draw.rect(self.screen, (80, 30, 30), self._deal_btn, border_radius=8)
+            pygame.draw.rect(self.screen, (80, 30, 30), self._deal_btn, border_radius=S(8))
             t = self._font.render('DRAW', True, _WHITE)
             self.screen.blit(t, t.get_rect(center=self._deal_btn.center))
 
@@ -385,8 +397,8 @@ class VideoPoker:
                      if self._win_amount > 0 else self._result_msg
             result_t = self._font.render(prefix, True, color)
             self.screen.blit(result_t,
-                             result_t.get_rect(center=(cx, self._card_y - 40)))
-            pygame.draw.rect(self.screen, (30, 100, 60), self._deal_btn, border_radius=8)
+                             result_t.get_rect(center=(cx, self._card_y - S(40))))
+            pygame.draw.rect(self.screen, (30, 100, 60), self._deal_btn, border_radius=S(8))
             t = self._font.render('PLAY AGAIN', True, _WHITE)
             self.screen.blit(t, t.get_rect(center=self._deal_btn.center))
 
@@ -399,18 +411,18 @@ class VideoPoker:
             if current_rank == ONE_PAIR and not is_jacks_or_better(self._hand):
                 current_rank = None  # low pair — no win, don't highlight
 
-        x      = 15
-        y      = 140
-        w      = 340
-        row_h  = 32
-        pad    = 8
+        x      = S(15)
+        y      = S(140)
+        w      = S(340)
+        row_h  = S(32)
+        pad    = S(8)
 
         # Header
         hdr = self._small.render('PAY TABLE', True, _GOLD)
         self.screen.blit(hdr, hdr.get_rect(center=(x + w // 2, y)))
-        y += 24
+        y += S(24)
         pygame.draw.line(self.screen, _GOLD, (x, y), (x + w, y), 1)
-        y += 6
+        y += S(6)
 
         for rank, label, mult in _PAYTABLE_ROWS:
             win_amt = mult * self._bet
@@ -418,8 +430,8 @@ class VideoPoker:
 
             if highlighted:
                 bg = pygame.Rect(x, y, w, row_h - 2)
-                pygame.draw.rect(self.screen, (60, 50, 10), bg, border_radius=4)
-                pygame.draw.rect(self.screen, _GOLD, bg, 1, border_radius=4)
+                pygame.draw.rect(self.screen, (60, 50, 10), bg, border_radius=S(4))
+                pygame.draw.rect(self.screen, _GOLD, bg, 1, border_radius=S(4))
 
             text_color = _GOLD if highlighted else _WHITE
             name_t  = self._small.render(label, True, text_color)
