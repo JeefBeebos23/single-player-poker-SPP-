@@ -13,8 +13,7 @@ def main():
     pygame.mixer.init()
     sound.init()
     sound.play_music('menu')
-    screen = pygame.display.set_mode(
-        (WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption('Single Player Poker')
     clock = pygame.time.Clock()
 

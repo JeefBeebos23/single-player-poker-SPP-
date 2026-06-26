@@ -91,6 +91,10 @@ class VideoPoker:
         self._result_msg = ''
         self._win_amount = 0
 
+        # Bet typing state
+        self._typing_bet = False
+        self._bet_input  = ''
+
         # Animation state
         self._anim_count    = 0   # cards revealed so far
         self._anim_next_at  = 0   # timestamp to reveal next card
@@ -110,10 +114,11 @@ class VideoPoker:
             for i in range(5)
         ]
         cx = self._w // 2
-        self._deal_btn = pygame.Rect(cx - 55, card_y + CARD_H + 55, 110, 40)
-        self._bet_up   = pygame.Rect(cx + 90, self._h - 80, 40, 36)
-        self._bet_dn   = pygame.Rect(cx + 140, self._h - 80, 40, 36)
-        self._back_btn = pygame.Rect(30, 30, 100, 36)
+        self._deal_btn  = pygame.Rect(cx - 55, card_y + CARD_H + 55, 110, 40)
+        self._bet_up    = pygame.Rect(cx + 90,  self._h - 80, 40, 36)
+        self._bet_dn    = pygame.Rect(cx + 140, self._h - 80, 40, 36)
+        self._bet_rect  = pygame.Rect(cx - 70,  self._h - 82, 140, 36)
+        self._back_btn  = pygame.Rect(30, 30, 100, 36)
         self._card_start_x = card_start_x
         self._card_y = card_y
 
@@ -129,8 +134,15 @@ class VideoPoker:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
-                    pygame.display.toggle_fullscreen()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_F11:
+                        pygame.display.toggle_fullscreen()
+                    elif self._typing_bet:
+                        self._handle_bet_key(event)
+                    elif (event.unicode.isdigit()
+                          and self._phase == 'betting'):
+                        self._typing_bet = True
+                        self._bet_input = event.unicode
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._back_btn.collidepoint(event.pos):
                         running = False
@@ -171,14 +183,40 @@ class VideoPoker:
     # Input
     # ------------------------------------------------------------------
 
+    def _handle_bet_key(self, event) -> None:
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self._commit_bet_input()
+        elif event.key == pygame.K_ESCAPE:
+            self._typing_bet = False
+            self._bet_input  = ''
+        elif event.key == pygame.K_BACKSPACE:
+            self._bet_input = self._bet_input[:-1]
+        elif event.unicode.isdigit():
+            self._bet_input += event.unicode
+
+    def _commit_bet_input(self) -> None:
+        try:
+            amount = int(self._bet_input)
+            amount = round(amount / self._BET_STEP) * self._BET_STEP
+            self._bet = max(self._MIN_BET, min(self._MAX_BET, amount))
+        except ValueError:
+            pass
+        self._typing_bet = False
+        self._bet_input  = ''
+
     def _handle_click(self, pos: tuple) -> None:
         if self._phase == 'betting':
+            if self._typing_bet and not self._bet_rect.collidepoint(pos):
+                self._commit_bet_input()
             if self._deal_btn.collidepoint(pos):
                 if self.balance >= self._bet:
                     self._deal_initial()
-            if self._bet_up.collidepoint(pos):
+            elif self._bet_rect.collidepoint(pos):
+                self._typing_bet = True
+                self._bet_input  = str(self._bet)
+            elif self._bet_up.collidepoint(pos):
                 self._bet = min(self._MAX_BET, self._bet + self._BET_STEP)
-            if self._bet_dn.collidepoint(pos):
+            elif self._bet_dn.collidepoint(pos):
                 self._bet = max(self._MIN_BET, self._bet - self._BET_STEP)
 
         elif self._phase == 'holding':
@@ -202,6 +240,8 @@ class VideoPoker:
     # ------------------------------------------------------------------
 
     def _deal_initial(self) -> None:
+        self._typing_bet = False
+        self._bet_input  = ''
         self.balance -= self._bet
         self._deck   = Deck()
         self._deck.shuffle()
@@ -307,8 +347,12 @@ class VideoPoker:
 
         cx = self._w // 2
 
-        # Bet display
-        bet_t = self._font.render(f'Bet: ${self._bet}', True, _GOLD)
+        # Bet display (clickable during betting phase)
+        if self._typing_bet and self._phase == 'betting':
+            bet_label = f'Bet: ${self._bet_input}|' if self._bet_input else 'Bet: $|'
+        else:
+            bet_label = f'Bet: ${self._bet}'
+        bet_t = self._font.render(bet_label, True, _GOLD)
         self.screen.blit(bet_t, bet_t.get_rect(center=(cx, self._h - 65)))
 
         # Phase buttons

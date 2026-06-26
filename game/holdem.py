@@ -183,6 +183,10 @@ class HoldEm:
                         pygame.display.toggle_fullscreen()
                     elif self._typing_raise:
                         self._handle_raise_key(event)
+                    elif (event.unicode.isdigit()
+                          and self._game_phase == 'betting'):
+                        self._typing_raise = True
+                        self._raise_input = event.unicode
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self._game_phase != 'ai_turn':
                         self._handle_click(event.pos)
@@ -255,10 +259,7 @@ class HoldEm:
             elif self._btn_raise.collidepoint(pos):
                 if self._typing_raise:
                     self._commit_raise_input()
-                    self._player_raise()
-                else:
-                    self._typing_raise = True
-                    self._raise_input = str(self._raise_amt)
+                self._player_raise()
             elif self._btn_allin.collidepoint(pos):
                 self._player_all_in()
 
@@ -483,7 +484,6 @@ class HoldEm:
                 f'{self._opponents[winner].name} wins with '
                 f'{HAND_NAMES[ai_score[0]]}!'
             )
-            sound.play('lose')
             self._fire_dialogue_from('win_pot', winner)
 
         self._pot        = 0
@@ -591,7 +591,7 @@ class HoldEm:
             if self._typing_raise:
                 self._draw_btn(self._btn_raise,
                                f'${self._raise_input}|' if self._raise_input else '$|',
-                               _WHITE)
+                               _GOLD)
             else:
                 self._draw_btn(self._btn_raise, f'Raise ${self._raise_amt}', _GOLD)
             self._draw_btn(self._btn_plus,  '+', _GRAY)
