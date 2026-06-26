@@ -8,6 +8,7 @@ from ai.engine import decide
 from ai.dialogue import get_line
 from ui.renderer import draw_card, draw_card_back, CARD_W, CARD_H
 from ui.speech_bubble import SpeechBubble
+from core.window import S, toggle_borderless
 import core.sound as sound
 
 _GOLD  = (245, 200, 66)
@@ -46,9 +47,9 @@ class FiveCardDraw:
         self.difficulty = difficulty
         self.modifiers = modifiers
         self._w, self._h = screen.get_size()
-        self._font        = pygame.font.SysFont('Georgia', 24, bold=True)
-        self._font_banner = pygame.font.SysFont('Georgia', 40, bold=True)
-        self._small       = pygame.font.SysFont('Georgia', 18)
+        self._font        = pygame.font.SysFont('Georgia', S(24), bold=True)
+        self._font_banner = pygame.font.SysFont('Georgia', S(40), bold=True)
+        self._small       = pygame.font.SysFont('Georgia', S(18))
 
         self._num_ai    = num_ai
         self._opponents = generate_opponents(num_ai, difficulty)
@@ -62,7 +63,7 @@ class FiveCardDraw:
         else:
             self._opp_xs = [self._w // 4, 3 * self._w // 4]
             bubble_xs    = [self._w // 4, 3 * self._w // 4]
-        self._bubbles = [SpeechBubble(x, 80, self._small) for x in bubble_xs]
+        self._bubbles = [SpeechBubble(x, S(80), self._small) for x in bubble_xs]
 
         self._hand:   list[Card] = []
         self._marked: list[bool] = [False] * 5
@@ -97,31 +98,33 @@ class FiveCardDraw:
         self._typing_raise: bool = False
         self._raise_input:  str  = ''
 
-        card_start_x = (self._w - (5 * CARD_W + 4 * 12)) // 2
-        self._card_xs = [card_start_x + i * (CARD_W + 12) for i in range(5)]
-        self._card_y  = self._h // 2 + 20
+        self._cw = S(CARD_W)
+        self._ch = S(CARD_H)
+        card_start_x = (self._w - (5 * self._cw + 4 * S(12))) // 2
+        self._card_xs = [card_start_x + i * (self._cw + S(12)) for i in range(5)]
+        self._card_y  = self._h // 2 + S(20)
         self._hold_rects = [
-            pygame.Rect(self._card_xs[i], self._card_y + CARD_H + 8, CARD_W, 28)
+            pygame.Rect(self._card_xs[i], self._card_y + self._ch + S(8), self._cw, S(28))
             for i in range(5)
         ]
         self._card_rects = [
-            pygame.Rect(self._card_xs[i], self._card_y, CARD_W, CARD_H)
+            pygame.Rect(self._card_xs[i], self._card_y, self._cw, self._ch)
             for i in range(5)
         ]
 
         cx = self._w // 2
-        by = self._h - 70
+        by = self._h - S(70)
         # Button layout: Fold | Check/Call | [-] Raise $X [+] | All In
-        self._btn_fold  = pygame.Rect(cx - 290, by, 110, 40)
-        self._btn_check = pygame.Rect(cx - 168, by, 115, 40)
-        self._btn_call  = pygame.Rect(cx - 168, by, 115, 40)
-        self._btn_minus = pygame.Rect(cx - 42,  by,  28, 40)
-        self._btn_raise = pygame.Rect(cx - 6,   by, 110, 40)
-        self._btn_plus  = pygame.Rect(cx + 112, by,  28, 40)
-        self._btn_allin = pygame.Rect(cx + 148, by,  80, 40)
-        self._btn_draw  = pygame.Rect(cx - 60,  by, 120, 40)
-        self._btn_back  = pygame.Rect(30, 30, 100, 36)
-        self._btn_next  = pygame.Rect(cx - 75, by, 150, 40)
+        self._btn_fold  = pygame.Rect(cx - S(290), by, S(110), S(40))
+        self._btn_check = pygame.Rect(cx - S(168), by, S(115), S(40))
+        self._btn_call  = pygame.Rect(cx - S(168), by, S(115), S(40))
+        self._btn_minus = pygame.Rect(cx - S(42),  by,  S(28), S(40))
+        self._btn_raise = pygame.Rect(cx - S(6),   by, S(110), S(40))
+        self._btn_plus  = pygame.Rect(cx + S(112), by,  S(28), S(40))
+        self._btn_allin = pygame.Rect(cx + S(148), by,  S(80), S(40))
+        self._btn_draw  = pygame.Rect(cx - S(60),  by, S(120), S(40))
+        self._btn_back  = pygame.Rect(S(30), S(30), S(100), S(36))
+        self._btn_next  = pygame.Rect(cx - S(75), by, S(150), S(40))
 
         self._running = True
         self._start_round()
@@ -180,7 +183,7 @@ class FiveCardDraw:
                     self._running = False
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_F11:
-                        pygame.display.toggle_fullscreen()
+                        toggle_borderless()
                     elif self._typing_raise:
                         self._handle_raise_key(event)
                     elif (event.unicode.isdigit()
@@ -536,33 +539,35 @@ class FiveCardDraw:
     def _draw(self) -> None:
         self.screen.fill(_FELT)
         title = self._font.render('5-CARD DRAW', True, _GOLD)
-        self.screen.blit(title, title.get_rect(center=(self._w // 2, 40)))
+        self.screen.blit(title, title.get_rect(center=(self._w // 2, S(40))))
 
         player_bet = self._hand_start_balance - self.balance
         bal = self._small.render(
             f'Balance: ${self.balance:,}   Pot: ${self._pot:,}   Bet: ${player_bet:,}',
             True, _WHITE)
-        self.screen.blit(bal, bal.get_rect(center=(self._w // 2, 75)))
+        self.screen.blit(bal, bal.get_rect(center=(self._w // 2, S(75))))
 
         for i, p in enumerate(self._opponents):
             sx    = self._opp_xs[i]
             color = _WHITE if self._ai_active[i] else _GRAY
             ai_bet = self._hand_start_ai_stacks[i] - self._ai_stacks[i]
             name_t = self._small.render(p.name, True, color)
-            self.screen.blit(name_t, name_t.get_rect(center=(sx, 110)))
+            self.screen.blit(name_t, name_t.get_rect(center=(sx, S(110))))
             self.screen.blit(
                 self._small.render(f'${self._ai_stacks[i]:,}  (Bet: ${ai_bet:,})', True, color),
                 self._small.render(f'${self._ai_stacks[i]:,}  (Bet: ${ai_bet:,})', True, color)
-                    .get_rect(center=(sx, 130)))
+                    .get_rect(center=(sx, S(130))))
             if self._ai_active[i] and self._ai_hands[i]:
+                half_cw = self._cw // 2
                 if self._phase == 'result':
                     for j in range(5):
-                        bx = sx - 2 * (CARD_W // 2 + 4) + j * (CARD_W // 2 + 4)
-                        draw_card(self.screen, self._ai_hands[i][j], bx, 150, self._small)
+                        bx = sx - 2 * (half_cw + S(4)) + j * (half_cw + S(4))
+                        draw_card(self.screen, self._ai_hands[i][j], bx, S(150),
+                                  self._small, cw=self._cw, ch=self._ch)
                 else:
                     for j in range(5):
-                        bx = sx - 2 * (CARD_W // 2 + 4) + j * (CARD_W // 2 + 4)
-                        draw_card_back(self.screen, bx, 150)
+                        bx = sx - 2 * (half_cw + S(4)) + j * (half_cw + S(4))
+                        draw_card_back(self.screen, bx, S(150), cw=self._cw, ch=self._ch)
             self._bubbles[i].draw(self.screen)
 
         # Player hand
@@ -574,12 +579,15 @@ class FiveCardDraw:
             cx = self._card_xs[i]
             if self._phase == 'drawing':
                 if i in self._draw_indices and i not in revealed_set:
-                    draw_card_back(self.screen, cx, self._card_y)
+                    draw_card_back(self.screen, cx, self._card_y,
+                                   cw=self._cw, ch=self._ch)
                 else:
-                    draw_card(self.screen, card, cx, self._card_y, self._font)
+                    draw_card(self.screen, card, cx, self._card_y, self._font,
+                              cw=self._cw, ch=self._ch)
             else:
                 draw_card(self.screen, card, cx, self._card_y,
-                          self._font, self._marked[i])
+                          self._font, self._marked[i],
+                          cw=self._cw, ch=self._ch)
 
         if self._phase == 'draw':
             for i in range(5):
@@ -593,10 +601,10 @@ class FiveCardDraw:
             rank = evaluate(self._hand)[0]
             ht = self._small.render(f'Your hand: {HAND_NAMES[rank]}', True, _GOLD)
             self.screen.blit(ht, ht.get_rect(
-                center=(self._w // 2, self._card_y - 28)))
+                center=(self._w // 2, self._card_y - S(28))))
 
         # Back button
-        pygame.draw.rect(self.screen, _GRAY, self._btn_back, border_radius=6)
+        pygame.draw.rect(self.screen, _GRAY, self._btn_back, border_radius=S(6))
         bt = self._small.render('← Menu', True, _WHITE)
         self.screen.blit(bt, bt.get_rect(center=self._btn_back.center))
 
@@ -619,7 +627,7 @@ class FiveCardDraw:
             self._draw_btn(self._btn_allin, 'All In', _RED)
 
             if now < self._your_turn_until:
-                self._draw_overlay_label('Your Turn', _GREEN, self._h // 2 - 20)
+                self._draw_overlay_label('Your Turn', _GREEN, self._h // 2 - S(20))
             if now < self._phase_banner_until:
                 self._draw_phase_banner(self._phase_banner_text)
 
@@ -633,47 +641,47 @@ class FiveCardDraw:
                 i, p, action = self._ai_queue[self._ai_queue_idx]
                 elapsed = now - self._ai_action_start
                 if elapsed < 500:
-                    self._draw_overlay_label(f"{p.name}'s Turn", _WHITE, self._h // 2 - 20)
+                    self._draw_overlay_label(f"{p.name}'s Turn", _WHITE, self._h // 2 - S(20))
                 else:
                     self._draw_overlay_label(
                         f'{p.name}: {_ACTION_LABELS.get(action, action)}',
-                        _GOLD, self._h // 2 - 20)
+                        _GOLD, self._h // 2 - S(20))
 
         elif self._phase == 'result':
             r = self._font.render(self._result_msg, True, _GOLD)
-            r_rect = r.get_rect(center=(self._w // 2, self._card_y + CARD_H + 50))
-            bg = r_rect.inflate(24, 12)
-            pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
-            pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=8)
+            r_rect = r.get_rect(center=(self._w // 2, self._card_y + self._ch + S(50)))
+            bg = r_rect.inflate(S(24), S(12))
+            pygame.draw.rect(self.screen, _BOX, bg, border_radius=S(8))
+            pygame.draw.rect(self.screen, _GOLD, bg, 2, border_radius=S(8))
             self.screen.blit(r, r_rect)
             for k, line in enumerate(self._result_hand_lines):
                 ht = self._small.render(line, True, _WHITE)
                 self.screen.blit(ht, ht.get_rect(
-                    center=(self._w // 2, self._card_y + CARD_H + 78 + k * 22)))
+                    center=(self._w // 2, self._card_y + self._ch + S(78) + k * S(22))))
             label = 'Game Over' if self.balance <= 0 else 'Next Hand'
             self._draw_btn(self._btn_next, label, _GRAY if self.balance <= 0 else _GREEN)
 
         if self._message and self._phase not in ('result',):
             msg_t = self._small.render(self._message, True, _WHITE)
-            self.screen.blit(msg_t, msg_t.get_rect(center=(self._w // 2, self._h - 100)))
+            self.screen.blit(msg_t, msg_t.get_rect(center=(self._w // 2, self._h - S(100))))
 
     def _draw_btn(self, rect: pygame.Rect, label: str, color: tuple) -> None:
-        pygame.draw.rect(self.screen, color, rect, border_radius=8)
+        pygame.draw.rect(self.screen, color, rect, border_radius=S(8))
         t = self._small.render(label, True, _WHITE if color != _GOLD else _DARK)
         self.screen.blit(t, t.get_rect(center=rect.center))
 
     def _draw_overlay_label(self, text: str, color: tuple, cy: int) -> None:
         t    = self._font.render(text, True, color)
         rect = t.get_rect(center=(self._w // 2, cy))
-        bg   = rect.inflate(24, 10)
-        pygame.draw.rect(self.screen, _BOX, bg, border_radius=8)
-        pygame.draw.rect(self.screen, color, bg, 2, border_radius=8)
+        bg   = rect.inflate(S(24), S(10))
+        pygame.draw.rect(self.screen, _BOX, bg, border_radius=S(8))
+        pygame.draw.rect(self.screen, color, bg, 2, border_radius=S(8))
         self.screen.blit(t, rect)
 
     def _draw_phase_banner(self, text: str) -> None:
         t    = self._font_banner.render(text, True, _GOLD)
         rect = t.get_rect(center=(self._w // 2, self._h // 2))
-        bg   = rect.inflate(60, 30)
-        pygame.draw.rect(self.screen, _BOX, bg, border_radius=14)
-        pygame.draw.rect(self.screen, _GOLD, bg, 3, border_radius=14)
+        bg   = rect.inflate(S(60), S(30))
+        pygame.draw.rect(self.screen, _BOX, bg, border_radius=S(14))
+        pygame.draw.rect(self.screen, _GOLD, bg, max(2, S(3)), border_radius=S(14))
         self.screen.blit(t, rect)

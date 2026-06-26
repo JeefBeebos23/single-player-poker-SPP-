@@ -16,12 +16,22 @@ _UNSELECTED_BORDER = (180, 180, 180)
 _RANK_NAMES = {11: 'J', 12: 'Q', 13: 'K', 14: 'A'}
 
 # Pre-scaled suit images.  Populated lazily on first draw_card call.
-_SUIT_SMALL: dict[str, pygame.Surface] = {}   # ~16 px bounding box
-_SUIT_LARGE: dict[str, pygame.Surface] = {}   # ~32 px bounding box
+_SUIT_SMALL: dict[str, pygame.Surface] = {}
+_SUIT_LARGE: dict[str, pygame.Surface] = {}
 _SUITS_LOADED = False
 
 _CORNER_BOX = 16   # px bounding box for corner suit
 _CENTER_BOX = 32   # px bounding box for centre suit
+
+
+def init_scale(scale: float) -> None:
+    """Call once after main.py determines the window scale.  Forces suit reload."""
+    global _CORNER_BOX, _CENTER_BOX, _SUITS_LOADED, _SUIT_SMALL, _SUIT_LARGE
+    _CORNER_BOX = max(8,  int(16 * scale))
+    _CENTER_BOX = max(16, int(32 * scale))
+    _SUITS_LOADED = False
+    _SUIT_SMALL.clear()
+    _SUIT_LARGE.clear()
 
 
 def _asset_path(relative: str) -> str:
@@ -33,18 +43,11 @@ def _asset_path(relative: str) -> str:
 
 
 def _white_to_transparent(surf: pygame.Surface) -> pygame.Surface:
-    """Strip white background from a card-suit PNG.
-
-    Uses new_alpha = 255 - min(R,G,B) so white→transparent and
-    fully-saturated colours stay opaque.  Anti-aliased edges become
-    semi-transparent automatically.
-    """
     try:
         import numpy as np
-        raw = pygame.surfarray.array3d(surf)          # (w, h, 3) uint8 RGB
-        min_rgb = raw.min(axis=2).astype(np.int32)    # (w, h)
+        raw = pygame.surfarray.array3d(surf)
+        min_rgb = raw.min(axis=2).astype(np.int32)
         new_alpha = np.clip(255 - min_rgb, 0, 255).astype(np.uint8)
-
         result = pygame.Surface(surf.get_size(), pygame.SRCALPHA)
         rgb_ptr = pygame.surfarray.pixels3d(result)
         rgb_ptr[:] = raw
@@ -58,7 +61,6 @@ def _white_to_transparent(surf: pygame.Surface) -> pygame.Surface:
 
 
 def _fit_scale(surf: pygame.Surface, box: int) -> pygame.Surface:
-    """Scale surf so its longest edge equals box, keeping aspect ratio."""
     w, h = surf.get_size()
     scale = box / max(w, h, 1)
     nw = max(1, round(w * scale))
@@ -86,7 +88,6 @@ def _load_suits() -> None:
 
 def _blit_suit(surface: pygame.Surface, code: str,
                cx: int, cy: int, use_large: bool) -> bool:
-    """Blit a pre-loaded suit image centered at (cx, cy).  Returns True on success."""
     if not _SUITS_LOADED:
         _load_suits()
     imgs = _SUIT_LARGE if use_large else _SUIT_SMALL
@@ -97,10 +98,6 @@ def _blit_suit(surface: pygame.Surface, code: str,
     surface.blit(img, (cx - sw // 2, cy - sh // 2))
     return True
 
-
-# ---------------------------------------------------------------------------
-# Fallback polygon shapes (used when PNG images are unavailable)
-# ---------------------------------------------------------------------------
 
 def _draw_suit_shape(surface: pygame.Surface, suit: str,
                      cx: int, cy: int, r: int, color: tuple) -> None:
@@ -156,40 +153,49 @@ def _draw_suit_shape(surface: pygame.Surface, suit: str,
 
 # ---------------------------------------------------------------------------
 # Public drawing functions
+# cw / ch default to module constants (scale=1.0 baseline).
+# Pass scaled values (e.g. self._cw, self._ch) for higher-DPI rendering.
 # ---------------------------------------------------------------------------
 
 def draw_card(surface: pygame.Surface, card, x: int, y: int,
-              font: pygame.font.Font, selected: bool = False) -> None:
-    rect = pygame.Rect(x, y, CARD_W, CARD_H)
-    pygame.draw.rect(surface, _CARD_BG, rect, border_radius=6)
+              font: pygame.font.Font, selected: bool = False,
+              cw: int = CARD_W, ch: int = CARD_H) -> None:
+    pad    = max(2, cw // 16)
+    radius = max(4, cw // 13)
+    rect   = pygame.Rect(x, y, cw, ch)
+    pygame.draw.rect(surface, _CARD_BG, rect, border_radius=radius)
     border_color = _SELECTED_BORDER if selected else _UNSELECTED_BORDER
-    pygame.draw.rect(surface, border_color, rect, 3 if selected else 1, border_radius=6)
+    border_w = max(1, cw // 40)
+    pygame.draw.rect(surface, border_color, rect, border_w if not selected else border_w + 1,
+                     border_radius=radius)
 
     color    = _RED if card.suit in ('H', 'D') else _BLACK
     rank_str = _RANK_NAMES.get(card.rank, str(card.rank))
 
-    # Corner: rank text, suit symbol stacked below
     rank_surf = font.render(rank_str, True, color)
-    surface.blit(rank_surf, (x + 5, y + 5))
+    surface.blit(rank_surf, (x + pad, y + pad))
     fh = rank_surf.get_height()
     fw = rank_surf.get_width()
-    sr     = max(6, fh * 3 // 8)
-    suit_cx = x + 5 + max(fw, _CORNER_BOX) // 2
-    suit_cy = y + 5 + fh + sr + 3
+    sr      = max(6, fh * 3 // 8)
+    suit_cx = x + pad + max(fw, _CORNER_BOX) // 2
+    suit_cy = y + pad + fh + sr + max(2, cw // 40)
 
     if not _blit_suit(surface, card.suit, suit_cx, suit_cy, use_large=False):
         _draw_suit_shape(surface, card.suit, suit_cx, suit_cy, sr, color)
 
-    # Centre: large suit
-    if not _blit_suit(surface, card.suit,
-                      x + CARD_W // 2, y + CARD_H // 2, use_large=True):
-        _draw_suit_shape(surface, card.suit,
-                         x + CARD_W // 2, y + CARD_H // 2, 16, color)
+    center_r = max(8, cw // 5)
+    if not _blit_suit(surface, card.suit, x + cw // 2, y + ch // 2, use_large=True):
+        _draw_suit_shape(surface, card.suit, x + cw // 2, y + ch // 2, center_r, color)
 
 
-def draw_card_back(surface: pygame.Surface, x: int, y: int) -> None:
-    rect = pygame.Rect(x, y, CARD_W, CARD_H)
-    pygame.draw.rect(surface, _CARD_BACK, rect, border_radius=6)
-    pygame.draw.rect(surface, (255, 255, 255), rect, 1, border_radius=6)
-    inner = pygame.Rect(x + 6, y + 6, CARD_W - 12, CARD_H - 12)
-    pygame.draw.rect(surface, _CARD_BACK_INNER, inner, border_radius=4)
+def draw_card_back(surface: pygame.Surface, x: int, y: int,
+                   cw: int = CARD_W, ch: int = CARD_H) -> None:
+    radius = max(4, cw // 13)
+    inner_pad = max(4, cw // 13)
+    rect = pygame.Rect(x, y, cw, ch)
+    pygame.draw.rect(surface, _CARD_BACK, rect, border_radius=radius)
+    pygame.draw.rect(surface, (255, 255, 255), rect, 1, border_radius=radius)
+    inner = pygame.Rect(x + inner_pad, y + inner_pad,
+                        cw - 2 * inner_pad, ch - 2 * inner_pad)
+    pygame.draw.rect(surface, _CARD_BACK_INNER, inner,
+                     border_radius=max(3, cw // 16))
