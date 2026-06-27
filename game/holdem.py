@@ -10,14 +10,15 @@ from ui.speech_bubble import SpeechBubble
 from core.window import S, toggle_borderless
 import core.sound as sound
 
-_GOLD  = (245, 200, 66)
-_WHITE = (255, 255, 255)
-_FELT  = (10, 46, 26)
-_RED   = (220, 50, 50)
-_GREEN = (50, 200, 100)
-_GRAY  = (80, 80, 80)
-_DARK  = (30, 30, 30)
-_BOX   = (8, 30, 15)
+_GOLD      = (245, 200, 66)
+_WHITE     = (255, 255, 255)
+_FELT      = (10, 46, 26)
+_RED       = (220, 50, 50)
+_GREEN     = (50, 200, 100)
+_GRAY      = (80, 80, 80)
+_DARK      = (30, 30, 30)
+_BOX       = (8, 30, 15)
+_INPUT_BG  = (30, 100, 60)
 
 _SMALL_BLIND  = 5
 _BIG_BLIND    = 10
@@ -111,16 +112,17 @@ class HoldEm:
 
         cx = self._w // 2
         by = self._h - S(70)
-        # Button layout: Fold | Check/Call | [-] Raise $X [+] | All In
-        self._btn_fold  = pygame.Rect(cx - S(290), by, S(110), S(40))
-        self._btn_check = pygame.Rect(cx - S(168), by, S(115), S(40))
-        self._btn_call  = pygame.Rect(cx - S(168), by, S(115), S(40))
-        self._btn_minus = pygame.Rect(cx - S(42),  by,  S(28), S(40))
-        self._btn_raise = pygame.Rect(cx - S(6),   by, S(110), S(40))
-        self._btn_plus  = pygame.Rect(cx + S(112), by,  S(28), S(40))
-        self._btn_allin = pygame.Rect(cx + S(148), by,  S(80), S(40))
-        self._btn_back  = pygame.Rect(S(30), S(30), S(100), S(36))
-        self._btn_next  = pygame.Rect(cx - S(75), by, S(150), S(40))
+        # Fold | Check/Call | [-] [Amount box] [+] [Raise] | All In
+        self._btn_fold        = pygame.Rect(cx - S(290), by, S(110), S(40))
+        self._btn_check       = pygame.Rect(cx - S(168), by, S(115), S(40))
+        self._btn_call        = pygame.Rect(cx - S(168), by, S(115), S(40))
+        self._btn_minus       = pygame.Rect(cx - S(42),  by,  S(28), S(40))
+        self._btn_raise_input = pygame.Rect(cx - S(6),   by,  S(80), S(40))
+        self._btn_plus        = pygame.Rect(cx + S(82),  by,  S(28), S(40))
+        self._btn_raise       = pygame.Rect(cx + S(118), by,  S(80), S(40))
+        self._btn_allin       = pygame.Rect(cx + S(206), by,  S(80), S(40))
+        self._btn_back        = pygame.Rect(S(30), S(30), S(100), S(36))
+        self._btn_next        = pygame.Rect(cx - S(75), by, S(150), S(40))
 
         self._start_hand()
 
@@ -237,7 +239,7 @@ class HoldEm:
         self._raise_input = ''
 
     def _handle_click(self, pos: tuple) -> None:
-        if self._typing_raise and not self._btn_raise.collidepoint(pos):
+        if self._typing_raise and not self._btn_raise_input.collidepoint(pos):
             self._commit_raise_input()
 
         if self._btn_back.collidepoint(pos):
@@ -259,9 +261,10 @@ class HoldEm:
                 self._raise_amt = max(_RAISE_STEP, self._raise_amt - _RAISE_STEP)
             elif self._btn_plus.collidepoint(pos):
                 self._raise_amt = min(self.balance, self._raise_amt + _RAISE_STEP)
+            elif self._btn_raise_input.collidepoint(pos):
+                self._typing_raise = True
+                self._raise_input   = str(self._raise_amt)
             elif self._btn_raise.collidepoint(pos):
-                if self._typing_raise:
-                    self._commit_raise_input()
                 self._player_raise()
             elif self._btn_allin.collidepoint(pos):
                 self._player_all_in()
@@ -352,7 +355,9 @@ class HoldEm:
             po = self._cur_bet / max(1, self._pot) if self._cur_bet > 0 else 0.0
             action = decide(hs, po, self._phase, self.difficulty, p)
             if action == 'fold' and self._cur_bet == 0:
-                action = 'check'  # can't fold for free
+                action = 'check'
+            if action == 'check' and self._cur_bet > 0:
+                action = 'call'
             self._ai_queue.append((i, p, action))
 
         self._ai_queue_idx    = 0
@@ -485,6 +490,7 @@ class HoldEm:
                 f'{self._opponents[winner].name} wins with '
                 f'{HAND_NAMES[ai_score[0]]}!'
             )
+            sound.play('lose')
             self._fire_dialogue_from('win_pot', winner)
 
         self._pot        = 0
@@ -592,14 +598,16 @@ class HoldEm:
             else:
                 self._draw_btn(self._btn_call, f'Call ${self._cur_bet}', _GREEN)
             self._draw_btn(self._btn_minus, '−', _GRAY)
-            if self._typing_raise:
-                self._draw_btn(self._btn_raise,
-                               f'${self._raise_input}|' if self._raise_input else '$|',
-                               _GOLD, underline=True)
-            else:
-                self._draw_btn(self._btn_raise, f'Raise ${self._raise_amt}', _GOLD,
-                               underline=True)
+            # Amount input textbox
+            _box = self._btn_raise_input
+            pygame.draw.rect(self.screen, _INPUT_BG, _box, border_radius=S(8))
+            pygame.draw.rect(self.screen, _GOLD, _box, max(2, S(2)), border_radius=S(8))
+            _lbl = (f'${self._raise_input}|' if self._raise_input else '$|') \
+                   if self._typing_raise else f'${self._raise_amt}'
+            _lt  = self._small.render(_lbl, True, _WHITE)
+            self.screen.blit(_lt, _lt.get_rect(center=_box.center))
             self._draw_btn(self._btn_plus,  '+', _GRAY)
+            self._draw_btn(self._btn_raise, 'Raise', _GOLD)
             self._draw_btn(self._btn_allin, 'All In', _RED)
 
             # "Your Turn" flash after AI acts
