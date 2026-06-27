@@ -502,7 +502,6 @@ class FiveCardDraw:
                 f'{self._opponents[winner].name} wins with '
                 f'{HAND_NAMES[ai_score[0]]}!'
             )
-            sound.play('lose')
             self._fire_dialogue_from('win_pot', winner)
         self._pot     = 0
         self._phase   = 'result'

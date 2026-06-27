@@ -3,8 +3,9 @@ from ui.components import Button, VolumeSlider
 from core.window import S
 import core.sound as sound
 
-_GOLD = (245, 200, 66)
-_WHITE = (255, 255, 255)
+_GOLD    = (245, 200, 66)
+_WHITE   = (255, 255, 255)
+_VERSION = 'v1.9.3'
 
 
 class Menu:
@@ -71,6 +72,9 @@ class Menu:
 
     def draw(self, balance: int, difficulty: int) -> None:
         self.screen.blit(self._title, self._title_rect)
+
+        ver_text = self._font_small.render(_VERSION, True, (140, 140, 140))
+        self.screen.blit(ver_text, (self.width - ver_text.get_width() - S(16), S(16)))
 
         bal_text = self._font_small.render(f'Balance: ${balance:,}', True, _GOLD)
         self.screen.blit(bal_text, bal_text.get_rect(center=(self.width // 2, S(175))))

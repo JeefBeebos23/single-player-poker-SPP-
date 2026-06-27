@@ -30,7 +30,7 @@ _PLAYLIST_FILENAMES = [
 
 _SFX_NAMES = [
     'deal', 'flip', 'check', 'chip_collect',
-    'win_big', 'lose', 'click', 'fold', 'bubble_pop',
+    'win_big', 'click', 'fold', 'bubble_pop',
     'raise',
 ]
 
