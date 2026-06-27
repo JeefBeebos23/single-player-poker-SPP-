@@ -276,7 +276,7 @@ class VideoPoker:
         if won > 0:
             self._result_sound = 'win_big'
         else:
-            self._result_sound = 'lose'
+            self._result_sound = ''
 
         if not self._draw_indices:
             # Held all 5 — skip animation, go straight to result
@@ -362,7 +362,9 @@ class VideoPoker:
             bet_label = f'Bet: ${self._bet_input}|' if self._bet_input else 'Bet: $|'
         else:
             bet_label = f'Bet: ${self._bet}'
+        self._font.set_underline(self._phase == 'betting')
         bet_t = self._font.render(bet_label, True, _GOLD)
+        self._font.set_underline(False)
         self.screen.blit(bet_t, bet_t.get_rect(center=(cx, self._h - S(65))))
 
         # Phase buttons

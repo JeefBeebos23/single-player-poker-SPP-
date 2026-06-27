@@ -34,7 +34,7 @@ def toggle_borderless() -> None:
         pygame.display.set_mode((_WIN_W, _WIN_H), pygame.NOFRAME)
         _move_to_origin()
     else:
-        pygame.display.set_mode((_WIN_W, _WIN_H))
+        pygame.display.set_mode((_WIN_W, _WIN_H), pygame.RESIZABLE)
     pygame.display.set_caption('Single Player Poker')
 
 
