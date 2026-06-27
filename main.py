@@ -1,4 +1,5 @@
 import sys
+import ctypes
 import pygame
 import core.bankroll as bankroll
 from core.modifiers import EMPTY
@@ -27,6 +28,15 @@ def _detect_scale() -> tuple[int, int, float]:
 
 
 def main():
+    if sys.platform == 'win32':
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except Exception:
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()
+            except Exception:
+                pass
+
     pygame.init()
     pygame.mixer.init()
 
@@ -36,7 +46,7 @@ def main():
 
     sound.init()
     sound.play_music('menu')
-    screen = pygame.display.set_mode((WIN_W, WIN_H))
+    screen = pygame.display.set_mode((WIN_W, WIN_H), pygame.RESIZABLE)
     pygame.display.set_caption('Single Player Poker')
     clock = pygame.time.Clock()
 

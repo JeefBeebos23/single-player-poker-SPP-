@@ -30,7 +30,7 @@ _PLAYLIST_FILENAMES = [
 
 _SFX_NAMES = [
     'deal', 'flip', 'check', 'chip_collect',
-    'win_big', 'lose', 'click', 'fold', 'bubble_pop',
+    'win_big', 'click', 'fold', 'bubble_pop',
     'raise',
 ]
 
@@ -60,7 +60,6 @@ def init() -> None:
         'menu':        os.path.join(music_dir, 'menu.mp3'),
         'video_poker': os.path.join(music_dir, 'video_poker.mp3'),
         'win':         os.path.join(music_dir, 'win.mp3'),
-        'celebration': os.path.join(music_dir, 'celebration.mp3'),
     }
 
     # Scan for playlist tracks (only those that actually exist)

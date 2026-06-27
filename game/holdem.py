@@ -395,7 +395,6 @@ class HoldEm:
         if not active:
             sound.stop_music()
             sound.play('win_big')
-            sound.play_music_once('celebration')
             self.balance += self._pot
             self._result_msg = f'All opponents folded!  You win ${self._pot}.'
             self._pot = 0
@@ -478,7 +477,6 @@ class HoldEm:
             self.balance    += self._pot
             self._result_msg = f'You win!  {player_hand_name} — +${self._pot}'
             sound.play('win_big')
-            sound.play_music_once('celebration')
             self._fire_dialogue('lose_big')
         else:
             self._ai_stacks[winner] += self._pot
@@ -597,9 +595,10 @@ class HoldEm:
             if self._typing_raise:
                 self._draw_btn(self._btn_raise,
                                f'${self._raise_input}|' if self._raise_input else '$|',
-                               _GOLD)
+                               _GOLD, underline=True)
             else:
-                self._draw_btn(self._btn_raise, f'Raise ${self._raise_amt}', _GOLD)
+                self._draw_btn(self._btn_raise, f'Raise ${self._raise_amt}', _GOLD,
+                               underline=True)
             self._draw_btn(self._btn_plus,  '+', _GRAY)
             self._draw_btn(self._btn_allin, 'All In', _RED)
 
@@ -648,9 +647,13 @@ class HoldEm:
                              msg_t.get_rect(center=(self._w // 2, self._h - S(100))))
 
 
-    def _draw_btn(self, rect: pygame.Rect, label: str, color: tuple) -> None:
+    def _draw_btn(self, rect: pygame.Rect, label: str, color: tuple,
+                  underline: bool = False) -> None:
         pygame.draw.rect(self.screen, color, rect, border_radius=S(8))
-        t = self._small.render(label, True, _WHITE if color != _GOLD else _DARK)
+        text_color = _WHITE if color != _GOLD else _DARK
+        self._small.set_underline(underline)
+        t = self._small.render(label, True, text_color)
+        self._small.set_underline(False)
         self.screen.blit(t, t.get_rect(center=rect.center))
 
     def _draw_overlay_label(self, text: str, color: tuple, cy: int) -> None:
