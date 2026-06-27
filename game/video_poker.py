@@ -277,7 +277,7 @@ class VideoPoker:
         if won > 0:
             self._result_sound = 'win_big'
         else:
-            self._result_sound = 'lose'
+            self._result_sound = ''
 
         if not self._draw_indices:
             # Held all 5 — skip animation, go straight to result
