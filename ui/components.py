@@ -114,4 +114,4 @@ class VolumeSlider:
         pygame.draw.rect(surface, _GOLD, handle, border_radius=4)
         pct = int(self._value * 100)
         text = self.font.render(f'{self.label}: {pct}%', True, (255, 255, 255))
-        surface.blit(text, (self.rect.x, self.rect.y - 28))
+        surface.blit(text, (self.rect.x, self.rect.y - text.get_height() - 6))
